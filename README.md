@@ -599,3 +599,4 @@ Si tienes preguntas o necesitas ayuda:
 - Revisar la documentación en `/docs`
 - Verificar el health check en `/health`
 # api_huella_vital
+# api_huella_vital
