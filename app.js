@@ -42,18 +42,13 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Middleware para CORS
+const cors = require("cors");
+
 app.use(
   cors({
-    origin:
-      process.env.NODE_ENV === "production"
-        ? ["https://tu-dominio.com"] // Cambiar por tu dominio en producción
-        : [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://127.0.0.1:3000",
-          ],
+    origin: "https://huella-vital-veterinaria.vercel.app",
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
