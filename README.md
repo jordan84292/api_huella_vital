@@ -598,3 +598,4 @@ Si tienes preguntas o necesitas ayuda:
 - Crear un issue en el repositorio
 - Revisar la documentación en `/docs`
 - Verificar el health check en `/health`
+# api_huella_vital
