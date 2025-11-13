@@ -600,3 +600,4 @@ Si tienes preguntas o necesitas ayuda:
 - Verificar el health check en `/health`
 # api_huella_vital
 # api_huella_vital
+# api_huella_vital
