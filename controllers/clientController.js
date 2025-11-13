@@ -1,22 +1,22 @@
 /**
- * Controlador de Usuarios
- * @description Maneja todas las operaciones HTTP para la entidad Usuario
+ * Controlador de Clientes
+ * @description Maneja todas las operaciones HTTP para la entidad Cliente
  */
 
-const User = require("../models/User");
+const Client = require("../models/Client");
 const { validationResult } = require("express-validator");
 
 /**
- * Clase que maneja las operaciones del controlador de usuarios
+ * Clase que maneja las operaciones del controlador de clientes
  */
-class UserController {
+class ClientController {
   /**
-   * Obtiene todos los usuarios con paginación opcional
+   * Obtiene todos los clientes con paginación opcional
    * @param {Object} req - Objeto de solicitud Express
    * @param {Object} res - Objeto de respuesta Express
    * @returns {Promise<void>}
    */
-  static async getAllUsers(req, res) {
+  static async getAllClients(req, res) {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
@@ -26,30 +26,30 @@ class UserController {
 
       if (search) {
         // Si hay parámetro de búsqueda, buscar por nombre
-        const users = await User.searchByName(search);
+        const clients = await Client.searchByName(search);
         result = {
-          users,
+          clients,
           pagination: {
             currentPage: 1,
             totalPages: 1,
-            totalUsers: users.length,
+            totalClients: clients.length,
             hasNextPage: false,
             hasPrevPage: false,
           },
         };
       } else {
-        // Obtener usuarios con paginación
-        result = await User.paginate(page, limit);
+        // Obtener clientes con paginación
+        result = await Client.paginate(page, limit);
       }
 
       res.status(200).json({
         success: true,
-        message: "Usuarios obtenidos correctamente",
-        data: result.users,
+        message: "Clientes obtenidos correctamente",
+        data: result.clients,
         pagination: result.pagination,
       });
     } catch (error) {
-      console.error("Error en getAllUsers:", error);
+      console.error("Error en getAllClients:", error);
       res.status(500).json({
         success: false,
         message: "Error interno del servidor",
@@ -59,12 +59,12 @@ class UserController {
   }
 
   /**
-   * Obtiene un usuario por su ID
+   * Obtiene un cliente por su ID
    * @param {Object} req - Objeto de solicitud Express
    * @param {Object} res - Objeto de respuesta Express
    * @returns {Promise<void>}
    */
-  static async getUserById(req, res) {
+  static async getClientById(req, res) {
     try {
       const { id } = req.params;
 
@@ -76,22 +76,22 @@ class UserController {
         });
       }
 
-      const user = await User.findById(id);
+      const client = await Client.findById(id);
 
-      if (!user) {
+      if (!client) {
         return res.status(404).json({
           success: false,
-          message: "Usuario no encontrado",
+          message: "Cliente no encontrado",
         });
       }
 
       res.status(200).json({
         success: true,
-        message: "Usuario obtenido correctamente",
-        data: user,
+        message: "Cliente obtenido correctamente",
+        data: client,
       });
     } catch (error) {
-      console.error("Error en getUserById:", error);
+      console.error("Error en getClientById:", error);
       res.status(500).json({
         success: false,
         message: "Error interno del servidor",
@@ -101,12 +101,12 @@ class UserController {
   }
 
   /**
-   * Crea un nuevo usuario
+   * Crea un nuevo cliente
    * @param {Object} req - Objeto de solicitud Express
    * @param {Object} res - Objeto de respuesta Express
    * @returns {Promise<void>}
    */
-  static async createUser(req, res) {
+  static async createClient(req, res) {
     try {
       // Verificar errores de validación
       const errors = validationResult(req);
@@ -117,35 +117,36 @@ class UserController {
           errors: errors.array(),
         });
       }
-      console.log(req.body);
 
-      const { nombre, email, rolName, status, telefono } = req.body;
+      const { id, name, email, phone, address, city, status } = req.body;
 
       // Verificar si el email ya existe
-      const existingUser = await User.findByEmail(email);
-      if (existingUser) {
+      const existingClient = await Client.findByEmail(email);
+      if (existingClient) {
         return res.status(409).json({
           success: false,
           message: "El email ya está registrado",
         });
       }
 
-      // Crear el usuario
-      const newUser = await User.create({
-        nombre,
+      // Crear el cliente
+      const newClient = await Client.create({
+        id,
+        name,
         email,
-        rolName,
-        status,
-        telefono,
+        phone,
+        address,
+        city,
+        status: status || "Activo",
       });
 
       res.status(201).json({
         success: true,
-        message: "Usuario creado correctamente",
-        data: newUser,
+        message: "Cliente creado correctamente",
+        data: newClient,
       });
     } catch (error) {
-      console.error("Error en createUser:", error);
+      console.error("Error en createClient:", error);
       res.status(500).json({
         success: false,
         message: "Error interno del servidor",
@@ -155,12 +156,12 @@ class UserController {
   }
 
   /**
-   * Actualiza un usuario existente
+   * Actualiza un cliente existente
    * @param {Object} req - Objeto de solicitud Express
    * @param {Object} res - Objeto de respuesta Express
    * @returns {Promise<void>}
    */
-  static async updateUser(req, res) {
+  static async updateClient(req, res) {
     try {
       // Verificar errores de validación
       const errors = validationResult(req);
@@ -173,8 +174,7 @@ class UserController {
       }
 
       const { id } = req.params;
-      const { nombre, email, telefono, rolName, status } = req.body;
-      console.log(req.body);
+      const { name, email, phone, address, city, status } = req.body;
 
       // Validar que el ID sea un número
       if (isNaN(id)) {
@@ -184,42 +184,43 @@ class UserController {
         });
       }
 
-      // Verificar si el usuario existe
-      const existingUser = await User.findById(id);
-      if (!existingUser) {
+      // Verificar si el cliente existe
+      const existingClient = await Client.findById(id);
+      if (!existingClient) {
         return res.status(404).json({
           success: false,
-          message: "Usuario no encontrado",
+          message: "Cliente no encontrado",
         });
       }
 
-      // Verificar si el email ya existe en otro usuario
-      if (email !== existingUser.email) {
-        const emailUser = await User.findByEmail(email);
-        if (emailUser && emailUser.id !== parseInt(id)) {
+      // Verificar si el email ya existe en otro cliente
+      if (email !== existingClient.email) {
+        const emailClient = await Client.findByEmail(email);
+        if (emailClient && emailClient.id !== parseInt(id)) {
           return res.status(409).json({
             success: false,
-            message: "El email ya está registrado en otro usuario",
+            message: "El email ya está registrado en otro cliente",
           });
         }
       }
 
-      // Actualizar el usuario
-      const updatedUser = await User.update(id, {
-        nombre,
+      // Actualizar el cliente
+      const updatedClient = await Client.update(id, {
+        name,
         email,
-        telefono,
-        rolName,
+        phone,
+        address,
+        city,
         status,
       });
 
       res.status(200).json({
         success: true,
-        message: "Usuario actualizado correctamente",
-        data: updatedUser,
+        message: "Cliente actualizado correctamente",
+        data: updatedClient,
       });
     } catch (error) {
-      console.error("Error en updateUser:", error);
+      console.error("Error en updateClient:", error);
       res.status(500).json({
         success: false,
         message: "Error interno del servidor",
@@ -229,12 +230,12 @@ class UserController {
   }
 
   /**
-   * Elimina un usuario
+   * Elimina un cliente
    * @param {Object} req - Objeto de solicitud Express
    * @param {Object} res - Objeto de respuesta Express
    * @returns {Promise<void>}
    */
-  static async deleteUser(req, res) {
+  static async deleteClient(req, res) {
     try {
       const { id } = req.params;
 
@@ -246,24 +247,24 @@ class UserController {
         });
       }
 
-      // Verificar si el usuario existe
-      const existingUser = await User.findById(id);
-      if (!existingUser) {
+      // Verificar si el cliente existe
+      const existingClient = await Client.findById(id);
+      if (!existingClient) {
         return res.status(404).json({
           success: false,
-          message: "Usuario no encontrado",
+          message: "Cliente no encontrado",
         });
       }
 
-      // Eliminar el usuario
-      await User.delete(id);
+      // Eliminar el cliente
+      await Client.delete(id);
 
       res.status(200).json({
         success: true,
-        message: "Usuario eliminado correctamente",
+        message: "Cliente eliminado correctamente",
       });
     } catch (error) {
-      console.error("Error en deleteUser:", error);
+      console.error("Error en deleteClient:", error);
       res.status(500).json({
         success: false,
         message: "Error interno del servidor",
@@ -273,12 +274,12 @@ class UserController {
   }
 
   /**
-   * Busca usuarios por nombre
+   * Busca clientes por nombre, email o teléfono
    * @param {Object} req - Objeto de solicitud Express
    * @param {Object} res - Objeto de respuesta Express
    * @returns {Promise<void>}
    */
-  static async searchUsers(req, res) {
+  static async searchClients(req, res) {
     try {
       const { q } = req.query;
 
@@ -289,16 +290,16 @@ class UserController {
         });
       }
 
-      const users = await User.searchByName(q.trim());
+      const clients = await Client.searchByName(q.trim());
 
       res.status(200).json({
         success: true,
         message: "Búsqueda completada",
-        data: users,
-        count: users.length,
+        data: clients,
+        count: clients.length,
       });
     } catch (error) {
-      console.error("Error en searchUsers:", error);
+      console.error("Error en searchClients:", error);
       res.status(500).json({
         success: false,
         message: "Error interno del servidor",
@@ -308,25 +309,25 @@ class UserController {
   }
 
   /**
-   * Obtiene estadísticas de usuarios
+   * Obtiene estadísticas de clientes
    * @param {Object} req - Objeto de solicitud Express
    * @param {Object} res - Objeto de respuesta Express
    * @returns {Promise<void>}
    */
-  static async getUserStats(req, res) {
+  static async getClientStats(req, res) {
     try {
-      const total = await User.count();
+      const total = await Client.count();
 
       res.status(200).json({
         success: true,
         message: "Estadísticas obtenidas correctamente",
         data: {
-          totalUsers: total,
+          totalClients: total,
           timestamp: new Date().toISOString(),
         },
       });
     } catch (error) {
-      console.error("Error en getUserStats:", error);
+      console.error("Error en getClientStats:", error);
       res.status(500).json({
         success: false,
         message: "Error interno del servidor",
@@ -336,4 +337,4 @@ class UserController {
   }
 }
 
-module.exports = UserController;
+module.exports = ClientController;

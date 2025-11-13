@@ -1,275 +1,312 @@
 /**
- * Modelo de Usuario
+ * Modelo de Usuario con Supabase
  * @description Maneja todas las operaciones CRUD para la entidad Usuario
  */
 
-const { pool } = require('../config/database');
+const { supabase } = require("../config/database");
 
-/**
- * Clase que representa el modelo de Usuario
- */
 class User {
-    /**
-     * Constructor para crear una instancia de Usuario
-     * @param {Object} userData - Datos del usuario
-     * @param {number} userData.id - ID del usuario
-     * @param {string} userData.nombre - Nombre del usuario
-     * @param {string} userData.email - Email del usuario
-     * @param {string} userData.telefono - Teléfono del usuario
-     * @param {string} userData.password - Contraseña hasheada del usuario
-     * @param {Date} userData.fecha_creacion - Fecha de creación
-     * @param {Date} userData.fecha_actualizacion - Fecha de actualización
-     */
-    constructor(userData) {
-        this.id = userData.id;
-        this.nombre = userData.nombre;
-        this.email = userData.email;
-        this.telefono = userData.telefono;
-        this.password = userData.password;
-        this.fecha_creacion = userData.fecha_creacion;
-        this.fecha_actualizacion = userData.fecha_actualizacion;
-    }
+  constructor(userData) {
+    this.id = userData.id;
+    this.nombre = userData.nombre;
+    this.email = userData.email;
+    this.telefono = userData.telefono;
+    this.password = userData.password;
+    this.fecha_creacion = userData.fecha_creacion;
+    this.fecha_actualizacion = userData.fecha_actualizacion;
+  }
 
-    /**
-     * Obtiene todos los usuarios de la base de datos
-     * @returns {Promise<Array>} Array de usuarios
-     */
-    static async findAll() {
-        try {
-            const [rows] = await pool.execute(
-                'SELECT id, nombre, email, telefono, fecha_creacion, fecha_actualizacion FROM usuarios ORDER BY fecha_creacion DESC'
-            );
-            return rows;
-        } catch (error) {
-            console.error('Error en User.findAll:', error);
-            throw new Error('Error al obtener usuarios');
+  /**
+   * Obtiene todos los usuarios
+   */
+  static async findAll() {
+    try {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select(
+          "id, nombre, email, telefono, fecha_creacion, fecha_actualizacion"
+        )
+        .order("fecha_creacion", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error("Error en User.findAll:", error);
+      throw new Error("Error al obtener usuarios");
+    }
+  }
+
+  /**
+   * Busca un usuario por ID
+   */
+  static async findById(id) {
+    try {
+      const { data, error } = await supabase
+        .from("viewuserrol")
+        .select(
+          "id, nombre, email, telefono, rolName, status, fecha_creacion, fecha_actualizacion"
+        )
+        .eq("id", id)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error; // PGRST116 = no rows returned
+      return data;
+    } catch (error) {
+      console.error("Error en User.findById:", error);
+      throw new Error("Error al buscar usuario por ID");
+    }
+  }
+
+  /**
+   * Busca un usuario por email
+   */
+  static async findByEmail(email) {
+    try {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select(
+          "id, nombre, email, telefono, fecha_creacion, fecha_actualizacion"
+        )
+        .eq("email", email)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
+    } catch (error) {
+      console.error("Error en User.findByEmail:", error);
+      throw new Error("Error al buscar usuario por email");
+    }
+  }
+
+  /**
+   * Crea un nuevo usuario
+   */
+  static async create(userData) {
+    try {
+      let { nombre, email, rolName, status, telefono, password } = userData;
+
+      if (!password) {
+        password =
+          "$2a$12$EvXWYFrmIDImmqpUckeb6.VwCSIi8JX4guQevhu9lJzfElf6AdRvu";
+      }
+
+      // Mapeo de roles
+      const roleMap = {
+        Administrador: "1",
+        Veterinario: "2",
+        Recepcionista: "3",
+        Asistente: "4",
+      };
+      const rol = roleMap[rolName];
+
+      const { data, error } = await supabase
+        .from("usuarios")
+        .insert([
+          {
+            nombre,
+            email,
+            telefono,
+            rol,
+            status,
+            password,
+            fecha_creacion: new Date().toISOString(),
+            fecha_actualizacion: new Date().toISOString(),
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === "23505") {
+          // Unique violation
+          throw new Error("El email ya está registrado");
         }
-    }
+        throw error;
+      }
 
-    /**
-     * Busca un usuario por su ID
-     * @param {number} id - ID del usuario
-     * @returns {Promise<Object|null>} Usuario encontrado o null
-     */
-    static async findById(id) {
-        try {
-            const [rows] = await pool.execute(
-                'SELECT id, nombre, email, telefono, fecha_creacion, fecha_actualizacion FROM usuarios WHERE id = ?',
-                [id]
-            );
-            return rows.length > 0 ? rows[0] : null;
-        } catch (error) {
-            console.error('Error en User.findById:', error);
-            throw new Error('Error al buscar usuario por ID');
+      const newUser = await this.findById(data.id);
+      if (newUser) {
+        delete newUser.password;
+      }
+      return newUser;
+    } catch (error) {
+      console.error("Error en User.create:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualiza un usuario existente
+   */
+  static async update(id, userData) {
+    try {
+      const { nombre, email, telefono, password, rolName, status } = userData;
+
+      const roleMap = {
+        Administrador: "1",
+        Veterinario: "2",
+        Recepcionista: "3",
+        Asistente: "4",
+      };
+      const rol = roleMap[rolName];
+
+      const updateData = {
+        nombre,
+        email,
+        telefono,
+        rol,
+        status,
+        fecha_actualizacion: new Date().toISOString(),
+      };
+
+      if (password) {
+        updateData.password = password;
+      }
+
+      const { data, error } = await supabase
+        .from("usuarios")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === "23505") {
+          throw new Error("El email ya está registrado");
         }
+        throw error;
+      }
+
+      if (!data) return null;
+
+      const updatedUser = await this.findById(id);
+      if (updatedUser) {
+        delete updatedUser.password;
+      }
+      return updatedUser;
+    } catch (error) {
+      console.error("Error en User.update:", error);
+      throw error;
     }
+  }
 
-    /**
-     * Busca un usuario por su email
-     * @param {string} email - Email del usuario
-     * @returns {Promise<Object|null>} Usuario encontrado o null
-     */
-    static async findByEmail(email) {
-        try {
-            const [rows] = await pool.execute(
-                'SELECT id, nombre, email, telefono, fecha_creacion, fecha_actualizacion FROM usuarios WHERE email = ?',
-                [email]
-            );
-            return rows.length > 0 ? rows[0] : null;
-        } catch (error) {
-            console.error('Error en User.findByEmail:', error);
-            throw new Error('Error al buscar usuario por email');
-        }
+  /**
+   * Busca un usuario por email con password (para autenticación)
+   */
+  static async findByEmailWithPassword(email) {
+    try {
+      const { data, error } = await supabase
+        .from("viewuserrol")
+        .select("*")
+        .eq("email", email)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
+    } catch (error) {
+      console.error("Error en User.findByEmailWithPassword:", error);
+      throw new Error("Error al buscar usuario por email");
     }
+  }
 
-    /**
-     * Crea un nuevo usuario en la base de datos
-     * @param {Object} userData - Datos del usuario
-     * @param {string} userData.nombre - Nombre del usuario
-     * @param {string} userData.email - Email del usuario
-     * @param {string} userData.telefono - Teléfono del usuario
-     * @param {string} userData.password - Contraseña hasheada del usuario
-     * @returns {Promise<Object>} Usuario creado
-     */
-    static async create(userData) {
-        try {
-            const { nombre, email, telefono, password } = userData;
-            
-            const [result] = await pool.execute(
-                'INSERT INTO usuarios (nombre, email, telefono, password, fecha_creacion, fecha_actualizacion) VALUES (?, ?, ?, ?, NOW(), NOW())',
-                [nombre, email, telefono, password]
-            );
+  /**
+   * Elimina un usuario
+   */
+  static async delete(id) {
+    try {
+      const { error } = await supabase.from("usuarios").delete().eq("id", id);
 
-            // Obtener el usuario recién creado (sin contraseña)
-            const newUser = await this.findById(result.insertId);
-            if (newUser) {
-                delete newUser.password; // No devolver la contraseña
-            }
-            return newUser;
-        } catch (error) {
-            console.error('Error en User.create:', error);
-            if (error.code === 'ER_DUP_ENTRY') {
-                throw new Error('El email ya está registrado');
-            }
-            throw new Error('Error al crear usuario');
-        }
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error("Error en User.delete:", error);
+      throw new Error("Error al eliminar usuario");
     }
+  }
 
-    /**
-     * Actualiza un usuario existente
-     * @param {number} id - ID del usuario
-     * @param {Object} userData - Datos a actualizar
-     * @returns {Promise<Object|null>} Usuario actualizado o null
-     */
-    static async update(id, userData) {
-        try {
-            const { nombre, email, telefono, password } = userData;
-            
-            let query = 'UPDATE usuarios SET nombre = ?, email = ?, telefono = ?, fecha_actualizacion = NOW()';
-            let params = [nombre, email, telefono];
-            
-            // Si se proporciona una nueva contraseña, incluirla en la actualización
-            if (password) {
-                query += ', password = ?';
-                params.push(password);
-            }
-            
-            query += ' WHERE id = ?';
-            params.push(id);
-            
-            const [result] = await pool.execute(query, params);
+  /**
+   * Busca usuarios por nombre
+   */
+  static async searchByName(nombre) {
+    try {
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select(
+          "id, nombre, email, telefono, fecha_creacion, fecha_actualizacion"
+        )
+        .ilike("nombre", `%${nombre}%`)
+        .order("nombre");
 
-            if (result.affectedRows === 0) {
-                return null;
-            }
-
-            // Obtener el usuario actualizado (sin contraseña)
-            const updatedUser = await this.findById(id);
-            if (updatedUser) {
-                delete updatedUser.password;
-            }
-            return updatedUser;
-        } catch (error) {
-            console.error('Error en User.update:', error);
-            if (error.code === 'ER_DUP_ENTRY') {
-                throw new Error('El email ya está registrado');
-            }
-            throw new Error('Error al actualizar usuario');
-        }
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error("Error en User.searchByName:", error);
+      throw new Error("Error al buscar usuarios por nombre");
     }
+  }
 
-    /**
-     * Busca un usuario por email para autenticación (incluye password)
-     * @param {string} email - Email del usuario
-     * @returns {Promise<Object|null>} Usuario encontrado con password o null
-     */
-    static async findByEmailWithPassword(email) {
-        try {
-            const [rows] = await pool.execute(
-                'SELECT * FROM usuarios WHERE email = ?',
-                [email]
-            );
-            return rows.length > 0 ? rows[0] : null;
-        } catch (error) {
-            console.error('Error en User.findByEmailWithPassword:', error);
-            throw new Error('Error al buscar usuario por email');
-        }
+  /**
+   * Cuenta el total de usuarios
+   */
+  static async count() {
+    try {
+      const { count, error } = await supabase
+        .from("usuarios")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      return count || 0;
+    } catch (error) {
+      console.error("Error en User.count:", error);
+      throw new Error("Error al contar usuarios");
     }
+  }
 
-    /**
-     * Elimina un usuario por su ID
-     * @param {number} id - ID del usuario
-     * @returns {Promise<boolean>} True si se eliminó correctamente
-     */
-    static async delete(id) {
-        try {
-            const [result] = await pool.execute(
-                'DELETE FROM usuarios WHERE id = ?',
-                [id]
-            );
-            return result.affectedRows > 0;
-        } catch (error) {
-            console.error('Error en User.delete:', error);
-            throw new Error('Error al eliminar usuario');
-        }
+  /**
+   * Obtiene usuarios con paginación
+   */
+  static async paginate(page = 1, limit = 10) {
+    try {
+      const pageInt = parseInt(page) || 1;
+      let limitInt = parseInt(limit) || 10;
+
+      if (limitInt < 1) limitInt = 10;
+      if (limitInt > 100) limitInt = 100;
+
+      const from = (pageInt - 1) * limitInt;
+      const to = from + limitInt - 1;
+
+      const {
+        data: users,
+        error,
+        count,
+      } = await supabase
+        .from("viewuserrol")
+        .select("*", { count: "exact" })
+        .order("fecha_creacion", { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      const total = count || 0;
+      const totalPages = Math.ceil(total / limitInt);
+
+      return {
+        users: users || [],
+        pagination: {
+          currentPage: pageInt,
+          totalPages,
+          totalUsers: total,
+          hasNextPage: pageInt < totalPages,
+          hasPrevPage: pageInt > 1,
+          limit: limitInt,
+        },
+      };
+    } catch (error) {
+      console.error("Error en User.paginate:", error);
+      throw new Error("Error al paginar usuarios");
     }
-
-    /**
-     * Busca usuarios por nombre (búsqueda parcial)
-     * @param {string} nombre - Nombre a buscar
-     * @returns {Promise<Array>} Array de usuarios encontrados
-     */
-    static async searchByName(nombre) {
-        try {
-            const [rows] = await pool.execute(
-                'SELECT id, nombre, email, telefono, fecha_creacion, fecha_actualizacion FROM usuarios WHERE nombre LIKE ? ORDER BY nombre',
-                [`%${nombre}%`]
-            );
-            return rows;
-        } catch (error) {
-            console.error('Error en User.searchByName:', error);
-            throw new Error('Error al buscar usuarios por nombre');
-        }
-    }
-
-    /**
-     * Cuenta el total de usuarios
-     * @returns {Promise<number>} Número total de usuarios
-     */
-    static async count() {
-        try {
-            const [rows] = await pool.execute('SELECT COUNT(*) as total FROM usuarios');
-            return rows[0].total;
-        } catch (error) {
-            console.error('Error en User.count:', error);
-            throw new Error('Error al contar usuarios');
-        }
-    }
-
-    /**
-     * Obtiene usuarios con paginación
-     * @param {number} page - Número de página (empezando en 1)
-     * @param {number} limit - Límite de usuarios por página
-     * @returns {Promise<Object>} Objeto con usuarios y metadatos de paginación
-     */
-    static async paginate(page = 1, limit = 10) {
-        try {
-            // Asegurar que page y limit sean números enteros
-            const pageInt = parseInt(page) || 1;
-            const limitInt = parseInt(limit) || 10;
-            const offset = (pageInt - 1) * limitInt;
-            
-            // Validar parámetros
-            if (pageInt < 1) pageInt = 1;
-            if (limitInt < 1) limitInt = 10;
-            if (limitInt > 100) limitInt = 100; // Límite máximo
-            
-            // Obtener usuarios paginados usando interpolación directa
-            const [users] = await pool.execute(
-                `SELECT id, nombre, email, telefono, fecha_creacion, fecha_actualizacion FROM usuarios ORDER BY fecha_creacion DESC LIMIT ${limitInt} OFFSET ${offset}`
-            );
-
-            // Obtener total de usuarios
-            const total = await this.count();
-            const totalPages = Math.ceil(total / limitInt);
-
-            return {
-                users,
-                pagination: {
-                    currentPage: pageInt,
-                    totalPages,
-                    totalUsers: total,
-                    hasNextPage: pageInt < totalPages,
-                    hasPrevPage: pageInt > 1,
-                    limit: limitInt
-                }
-            };
-        } catch (error) {
-            console.error('Error en User.paginate:', error);
-            console.error('Detalles del error:', error.stack);
-            throw new Error('Error al paginar usuarios');
-        }
-    }
+  }
 }
 
 module.exports = User;
