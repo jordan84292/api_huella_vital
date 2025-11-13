@@ -20,29 +20,13 @@ class Appointment {
 
   static async findAll() {
     try {
-      const { data, error } = await supabase
+      const { data: appointments, error } = await supabase
         .from("appointments")
-        .select(
-          `
-          *,
-          patients!inner(name, species),
-          clientes!inner(name)
-        `
-        )
-        .order("date", { ascending: false })
-        .order("time", { ascending: false });
+        .select("*");
 
       if (error) throw error;
-
-      // Transformar datos para coincidir con el formato esperado
-      return (data || []).map((appointment) => ({
-        ...appointment,
-        patientName: appointment.patients.name,
-        species: appointment.patients.species,
-        ownerName: appointment.clientes.name,
-      }));
+      return appointments;
     } catch (error) {
-      console.error("Error en Appointment.findAll:", error);
       throw new Error("Error al obtener citas");
     }
   }
