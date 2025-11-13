@@ -1,13 +1,10 @@
-const { pool } = require("../config/database");
-
 /**
- * Clase que representa el modelo de Paciente
+ * Modelo de Paciente con Supabase
  */
+
+const { supabase } = require("../config/database");
+
 class Patient {
-  /**
-   * Constructor para crear una instancia de Paciente
-   * @param {Object} patientData - Datos del paciente
-   */
   constructor(patientData) {
     this.id = patientData.id;
     this.name = patientData.name;
@@ -28,98 +25,93 @@ class Patient {
     this.updated_date = patientData.updated_date;
   }
 
-  /**
-   * Obtiene todos los pacientes de la base de datos
-   * @returns {Promise<Array>} Array de pacientes
-   */
   static async findAll() {
     try {
-      const [rows] = await pool.execute(
-        `SELECT id, name, species, breed, age, weight, gender, birthDate, 
-         ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
-         created_date, updated_date 
-         FROM patients 
-         ORDER BY created_date DESC`
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("patients")
+        .select(
+          `
+          id, name, species, breed, age, weight, gender, birthDate,
+          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
+          created_date, updated_date
+        `
+        )
+        .order("created_date", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error en Patient.findAll:", error);
       throw new Error("Error al obtener pacientes");
     }
   }
 
-  /**
-   * Busca un paciente por su ID
-   * @param {number} id - ID del paciente
-   * @returns {Promise<Object|null>} Paciente encontrado o null
-   */
   static async findById(id) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT id, name, species, breed, age, weight, gender, birthDate, 
-         ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
-         created_date, updated_date 
-         FROM patients 
-         WHERE id = ?`,
-        [id]
-      );
-      return rows.length > 0 ? rows[0] : null;
+      const { data, error } = await supabase
+        .from("patients")
+        .select(
+          `
+          id, name, species, breed, age, weight, gender, birthDate,
+          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
+          created_date, updated_date
+        `
+        )
+        .eq("id", id)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
     } catch (error) {
       console.error("Error en Patient.findById:", error);
       throw new Error("Error al buscar paciente por ID");
     }
   }
 
-  /**
-   * Busca pacientes por dueño
-   * @param {number} ownerId - ID del dueño
-   * @returns {Promise<Array>} Array de pacientes
-   */
   static async findByOwnerId(ownerId) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT id, name, species, breed, age, weight, gender, birthDate, 
-         ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
-         created_date, updated_date 
-         FROM patients 
-         WHERE ownerId = ?
-         ORDER BY name`,
-        [ownerId]
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("patients")
+        .select(
+          `
+          id, name, species, breed, age, weight, gender, birthDate,
+          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
+          created_date, updated_date
+        `
+        )
+        .eq("ownerId", ownerId)
+        .order("name");
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error en Patient.findByOwnerId:", error);
       throw new Error("Error al buscar pacientes por dueño");
     }
   }
 
-  /**
-   * Busca un paciente por microchip
-   * @param {string} microchip - Número de microchip
-   * @returns {Promise<Object|null>} Paciente encontrado o null
-   */
   static async findByMicrochip(microchip) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT id, name, species, breed, age, weight, gender, birthDate, 
-         ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
-         created_date, updated_date 
-         FROM patients 
-         WHERE microchip = ?`,
-        [microchip]
-      );
-      return rows.length > 0 ? rows[0] : null;
+      const { data, error } = await supabase
+        .from("patients")
+        .select(
+          `
+          id, name, species, breed, age, weight, gender, birthDate,
+          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
+          created_date, updated_date
+        `
+        )
+        .eq("microchip", microchip)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
     } catch (error) {
       console.error("Error en Patient.findByMicrochip:", error);
       throw new Error("Error al buscar paciente por microchip");
     }
   }
 
-  /**
-   * Crea un nuevo paciente en la base de datos
-   * @param {Object} patientData - Datos del paciente
-   * @returns {Promise<Object>} Paciente creado
-   */
   static async create(patientData) {
     try {
       const {
@@ -138,45 +130,47 @@ class Patient {
         status,
       } = patientData;
 
-      const [result] = await pool.execute(
-        `INSERT INTO patients 
-         (name, species, breed, age, weight, gender, birthDate, ownerId,lastVisit, nextVisit, microchip, color, allergies, status, 
-          created_date, updated_date) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?,NOW(), ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          name,
-          species,
-          breed,
-          age,
-          weight,
-          gender,
-          birthDate || null,
-          ownerId,
-          nextVisit || null,
-          microchip || null,
-          color || null,
-          allergies || null,
-          status || "Activo",
-        ]
-      );
+      const now = new Date().toISOString();
 
-      const newPatient = await this.findById(result.insertId);
-      return newPatient;
+      const { data, error } = await supabase
+        .from("patients")
+        .insert([
+          {
+            name,
+            species,
+            breed,
+            age,
+            weight,
+            gender,
+            birthDate: birthDate || null,
+            ownerId,
+            lastVisit: now,
+            nextVisit: nextVisit || null,
+            microchip: microchip || null,
+            color: color || null,
+            allergies: allergies || null,
+            status: status || "Activo",
+            created_date: now,
+            updated_date: now,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === "23505") {
+          throw new Error("El microchip ya está registrado");
+        }
+        throw error;
+      }
+
+      return data;
     } catch (error) {
       console.error("Error en Patient.create:", error);
-      if (error.code === "ER_DUP_ENTRY") {
-        throw new Error("El microchip ya está registrado");
-      }
-      throw new Error("Error al crear paciente");
+      throw error;
     }
   }
 
-  /**
-   * Actualiza un paciente existente
-   * @param {number} id - ID del paciente
-   * @param {Object} patientData - Datos a actualizar
-   * @returns {Promise<Object|null>} Paciente actualizado o null
-   */
   static async update(id, patientData) {
     try {
       const {
@@ -196,129 +190,122 @@ class Patient {
         status,
       } = patientData;
 
-      const [result] = await pool.execute(
-        `UPDATE patients 
-         SET name = ?, species = ?, breed = ?, age = ?, weight = ?, 
-             gender = ?, birthDate = ?, ownerId = ?, lastVisit = ?, 
-             nextVisit = ?, microchip = ?, color = ?, allergies = ?, 
-             status = ?, updated_date = NOW()
-         WHERE id = ?`,
-        [
+      const { data, error } = await supabase
+        .from("patients")
+        .update({
           name,
           species,
           breed,
           age,
           weight,
           gender,
-          birthDate || null,
+          birthDate: birthDate || null,
           ownerId,
-          lastVisit || null,
-          nextVisit || null,
-          microchip || null,
-          color || null,
-          allergies || null,
+          lastVisit: lastVisit || null,
+          nextVisit: nextVisit || null,
+          microchip: microchip || null,
+          color: color || null,
+          allergies: allergies || null,
           status,
-          id,
-        ]
-      );
+          updated_date: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
 
-      if (result.affectedRows === 0) {
-        return null;
+      if (error) {
+        if (error.code === "23505") {
+          throw new Error("El microchip ya está registrado");
+        }
+        throw error;
       }
 
-      const updatedPatient = await this.findById(id);
-      return updatedPatient;
+      return data;
     } catch (error) {
       console.error("Error en Patient.update:", error);
-      if (error.code === "ER_DUP_ENTRY") {
-        throw new Error("El microchip ya está registrado");
-      }
-      throw new Error("Error al actualizar paciente");
+      throw error;
     }
   }
 
-  /**
-   * Elimina un paciente por su ID
-   * @param {number} id - ID del paciente
-   * @returns {Promise<boolean>} True si se eliminó correctamente
-   */
   static async delete(id) {
     try {
-      const [result] = await pool.execute("DELETE FROM patients WHERE id = ?", [
-        id,
-      ]);
-      return result.affectedRows > 0;
+      const { error } = await supabase.from("patients").delete().eq("id", id);
+
+      if (error) throw error;
+      return true;
     } catch (error) {
       console.error("Error en Patient.delete:", error);
       throw new Error("Error al eliminar paciente");
     }
   }
 
-  /**
-   * Busca pacientes por nombre (búsqueda parcial)
-   * @param {string} name - Nombre a buscar
-   * @returns {Promise<Array>} Array de pacientes encontrados
-   */
   static async searchByName(name) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT id, name, species, breed, age, weight, gender, birthDate, 
-         ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
-         created_date, updated_date 
-         FROM patients 
-         WHERE name LIKE ? 
-         ORDER BY name`,
-        [`%${name}%`]
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("patients")
+        .select(
+          `
+          id, name, species, breed, age, weight, gender, birthDate,
+          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
+          created_date, updated_date
+        `
+        )
+        .ilike("name", `%${name}%`)
+        .order("name");
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error en Patient.searchByName:", error);
       throw new Error("Error al buscar pacientes por nombre");
     }
   }
 
-  /**
-   * Cuenta el total de pacientes
-   * @returns {Promise<number>} Número total de pacientes
-   */
   static async count() {
     try {
-      const [rows] = await pool.execute(
-        "SELECT COUNT(*) as total FROM patients"
-      );
-      return rows[0].total;
+      const { count, error } = await supabase
+        .from("patients")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      return count || 0;
     } catch (error) {
       console.error("Error en Patient.count:", error);
       throw new Error("Error al contar pacientes");
     }
   }
 
-  /**
-   * Obtiene pacientes con paginación
-   * @param {number} page - Número de página (empezando en 1)
-   * @param {number} limit - Límite de pacientes por página
-   * @returns {Promise<Object>} Objeto con pacientes y metadatos de paginación
-   */
   static async paginate(page = 1, limit = 10) {
     try {
       const pageInt = parseInt(page) || 1;
       const limitInt = parseInt(limit) || 10;
-      const offset = (pageInt - 1) * limitInt;
+      const from = (pageInt - 1) * limitInt;
+      const to = from + limitInt - 1;
 
-      const [patients] = await pool.execute(
-        `SELECT id, name, species, breed, age, weight, gender, birthDate, 
-         ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
-         created_date, updated_date 
-         FROM patients 
-         ORDER BY created_date DESC 
-         LIMIT ${limitInt} OFFSET ${offset}`
-      );
+      const {
+        data: patients,
+        error,
+        count,
+      } = await supabase
+        .from("patients")
+        .select(
+          `
+          id, name, species, breed, age, weight, gender, birthDate,
+          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
+          created_date, updated_date
+        `,
+          { count: "exact" }
+        )
+        .order("created_date", { ascending: false })
+        .range(from, to);
 
-      const total = await this.count();
+      if (error) throw error;
+
+      const total = count || 0;
       const totalPages = Math.ceil(total / limitInt);
 
       return {
-        patients,
+        patients: patients || [],
         pagination: {
           currentPage: pageInt,
           totalPages,
@@ -334,38 +321,47 @@ class Patient {
     }
   }
 
-  /**
-   * Obtiene estadísticas de pacientes por especie
-   * @returns {Promise<Array>} Estadísticas por especie
-   */
   static async getStatsBySpecies() {
     try {
-      const [rows] = await pool.execute(
-        `SELECT species, COUNT(*) as count 
-         FROM patients 
-         GROUP BY species 
-         ORDER BY count DESC`
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("patients")
+        .select("species")
+        .order("species");
+
+      if (error) throw error;
+
+      // Agrupar manualmente ya que Supabase no tiene GROUP BY directo
+      const stats = {};
+      data.forEach((row) => {
+        stats[row.species] = (stats[row.species] || 0) + 1;
+      });
+
+      return Object.entries(stats)
+        .map(([species, count]) => ({ species, count }))
+        .sort((a, b) => b.count - a.count);
     } catch (error) {
       console.error("Error en Patient.getStatsBySpecies:", error);
       throw new Error("Error al obtener estadísticas por especie");
     }
   }
 
-  /**
-   * Obtiene estadísticas de pacientes por status
-   * @returns {Promise<Array>} Estadísticas por status
-   */
   static async getStatsByStatus() {
     try {
-      const [rows] = await pool.execute(
-        `SELECT status, COUNT(*) as count 
-         FROM patients 
-         GROUP BY status 
-         ORDER BY count DESC`
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("patients")
+        .select("status")
+        .order("status");
+
+      if (error) throw error;
+
+      const stats = {};
+      data.forEach((row) => {
+        stats[row.status] = (stats[row.status] || 0) + 1;
+      });
+
+      return Object.entries(stats)
+        .map(([status, count]) => ({ status, count }))
+        .sort((a, b) => b.count - a.count);
     } catch (error) {
       console.error("Error en Patient.getStatsByStatus:", error);
       throw new Error("Error al obtener estadísticas por status");

@@ -1,4 +1,8 @@
-const { pool } = require("../config/database");
+/**
+ * Modelo de Vacunación con Supabase
+ */
+
+const { supabase } = require("../config/database");
 
 class Vaccination {
   constructor(vaccinationData) {
@@ -16,10 +20,13 @@ class Vaccination {
 
   static async findAll() {
     try {
-      const [rows] = await pool.execute(
-        `SELECT * FROM vaccinations ORDER BY date DESC`
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("vaccinations")
+        .select("*")
+        .order("date", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error en Vaccination.findAll:", error);
       throw new Error("Error al obtener vacunaciones");
@@ -28,11 +35,14 @@ class Vaccination {
 
   static async findById(id) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT * FROM vaccinations WHERE id = ?`,
-        [id]
-      );
-      return rows.length > 0 ? rows[0] : null;
+      const { data, error } = await supabase
+        .from("vaccinations")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
     } catch (error) {
       console.error("Error en Vaccination.findById:", error);
       throw new Error("Error al buscar vacunación por ID");
@@ -41,11 +51,14 @@ class Vaccination {
 
   static async findByPatientId(patientId) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT * FROM vaccinations WHERE patientId = ? ORDER BY date DESC`,
-        [patientId]
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("vaccinations")
+        .select("*")
+        .eq("patientId", patientId)
+        .order("date", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error en Vaccination.findByPatientId:", error);
       throw new Error("Error al buscar vacunaciones por paciente");
@@ -54,16 +67,32 @@ class Vaccination {
 
   static async getUpcoming(days = 30) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT v.*, p.name as patientName, p.species, c.name as ownerName, c.phone as ownerPhone
-         FROM vaccinations v
-         INNER JOIN patients p ON v.patientId = p.id
-         INNER JOIN clients c ON p.ownerId = c.id
-         WHERE v.nextDue BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)
-         ORDER BY v.nextDue ASC`,
-        [days]
-      );
-      return rows;
+      const today = new Date();
+      const futureDate = new Date();
+      futureDate.setDate(today.getDate() + days);
+
+      const { data, error } = await supabase
+        .from("vaccinations")
+        .select(
+          `
+          *,
+          patients!inner(name, species, ownerId),
+          clients!inner(name, phone)
+        `
+        )
+        .gte("nextDue", today.toISOString().split("T")[0])
+        .lte("nextDue", futureDate.toISOString().split("T")[0])
+        .order("nextDue", { ascending: true });
+
+      if (error) throw error;
+
+      return (data || []).map((vaccination) => ({
+        ...vaccination,
+        patientName: vaccination.patients.name,
+        species: vaccination.patients.species,
+        ownerName: vaccination.clients.name,
+        ownerPhone: vaccination.clients.phone,
+      }));
     } catch (error) {
       console.error("Error en Vaccination.getUpcoming:", error);
       throw new Error("Error al obtener vacunaciones próximas");
@@ -72,16 +101,36 @@ class Vaccination {
 
   static async getOverdue() {
     try {
-      const [rows] = await pool.execute(
-        `SELECT v.*, p.name as patientName, p.species, c.name as ownerName, c.phone as ownerPhone,
-         DATEDIFF(CURDATE(), v.nextDue) as daysOverdue
-         FROM vaccinations v
-         INNER JOIN patients p ON v.patientId = p.id
-         INNER JOIN clients c ON p.ownerId = c.id
-         WHERE v.nextDue < CURDATE()
-         ORDER BY v.nextDue ASC`
-      );
-      return rows;
+      const today = new Date().toISOString().split("T")[0];
+
+      const { data, error } = await supabase
+        .from("vaccinations")
+        .select(
+          `
+          *,
+          patients!inner(name, species, ownerId),
+          clients!inner(name, phone)
+        `
+        )
+        .lt("nextDue", today)
+        .order("nextDue", { ascending: true });
+
+      if (error) throw error;
+
+      return (data || []).map((vaccination) => {
+        const nextDue = new Date(vaccination.nextDue);
+        const now = new Date();
+        const daysOverdue = Math.floor((now - nextDue) / (1000 * 60 * 60 * 24));
+
+        return {
+          ...vaccination,
+          patientName: vaccination.patients.name,
+          species: vaccination.patients.species,
+          ownerName: vaccination.clients.name,
+          ownerPhone: vaccination.clients.phone,
+          daysOverdue,
+        };
+      });
     } catch (error) {
       console.error("Error en Vaccination.getOverdue:", error);
       throw new Error("Error al obtener vacunaciones vencidas");
@@ -100,34 +149,46 @@ class Vaccination {
         notes,
       } = vaccinationData;
 
-      const [result] = await pool.execute(
-        `INSERT INTO vaccinations 
-         (patientId, date, vaccine, nextDue, veterinarian, batchNumber, notes, created_date, updated_date) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          patientId,
-          date,
-          vaccine,
-          nextDue,
-          veterinarian,
-          batchNumber,
-          notes || null,
-        ]
-      );
+      const now = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from("vaccinations")
+        .insert([
+          {
+            patientId,
+            date,
+            vaccine,
+            nextDue,
+            veterinarian,
+            batchNumber,
+            notes: notes || null,
+            created_date: now,
+            updated_date: now,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
 
       // Actualizar lastVisit del paciente si es más reciente
-      await pool.execute(
-        `UPDATE patients 
-         SET lastVisit = CASE 
-           WHEN lastVisit IS NULL OR ? > lastVisit THEN ? 
-           ELSE lastVisit 
-         END,
-         updated_date = NOW()
-         WHERE id = ?`,
-        [date, date, patientId]
-      );
+      const { data: patient } = await supabase
+        .from("patients")
+        .select("lastVisit")
+        .eq("id", patientId)
+        .single();
 
-      return await this.findById(result.insertId);
+      if (!patient?.lastVisit || new Date(date) > new Date(patient.lastVisit)) {
+        await supabase
+          .from("patients")
+          .update({
+            lastVisit: date,
+            updated_date: now,
+          })
+          .eq("id", patientId);
+      }
+
+      return await this.findById(data.id);
     } catch (error) {
       console.error("Error en Vaccination.create:", error);
       throw new Error("Error al crear vacunación");
@@ -146,12 +207,9 @@ class Vaccination {
         notes,
       } = vaccinationData;
 
-      const [result] = await pool.execute(
-        `UPDATE vaccinations 
-         SET patientId = ?, date = ?, vaccine = ?, nextDue = ?, 
-             veterinarian = ?, batchNumber = ?, notes = ?, updated_date = NOW()
-         WHERE id = ?`,
-        [
+      const { data, error } = await supabase
+        .from("vaccinations")
+        .update({
           patientId,
           date,
           vaccine,
@@ -159,13 +217,14 @@ class Vaccination {
           veterinarian,
           batchNumber,
           notes,
-          id,
-        ]
-      );
+          updated_date: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
 
-      if (result.affectedRows === 0) {
-        return null;
-      }
+      if (error) throw error;
+      if (!data) return null;
 
       return await this.findById(id);
     } catch (error) {
@@ -176,11 +235,13 @@ class Vaccination {
 
   static async delete(id) {
     try {
-      const [result] = await pool.execute(
-        "DELETE FROM vaccinations WHERE id = ?",
-        [id]
-      );
-      return result.affectedRows > 0;
+      const { error } = await supabase
+        .from("vaccinations")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      return true;
     } catch (error) {
       console.error("Error en Vaccination.delete:", error);
       throw new Error("Error al eliminar vacunación");
@@ -189,10 +250,12 @@ class Vaccination {
 
   static async count() {
     try {
-      const [rows] = await pool.execute(
-        "SELECT COUNT(*) as total FROM vaccinations"
-      );
-      return rows[0].total;
+      const { count, error } = await supabase
+        .from("vaccinations")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      return count || 0;
     } catch (error) {
       console.error("Error en Vaccination.count:", error);
       throw new Error("Error al contar vacunaciones");

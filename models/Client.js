@@ -1,17 +1,11 @@
 /**
- * Modelo de Cliente
+ * Modelo de Cliente con Supabase
  * @description Maneja todas las operaciones CRUD para la entidad Cliente
  */
 
-const { pool } = require("../config/database");
+const { supabase } = require("../config/database");
 
-/**
- * Clase que representa el modelo de Cliente
- */
 class Client {
-  /**
-   * Constructor para crear una instancia de Cliente
-   */
   constructor(clientData) {
     this.id = clientData.id;
     this.name = clientData.name;
@@ -24,15 +18,19 @@ class Client {
   }
 
   /**
-   * Obtiene todos los clientes de la base de datos
-   * @returns {Promise<Array>} Array de clientes
+   * Obtiene todos los clientes
    */
   static async findAll() {
     try {
-      const [rows] = await pool.execute(
-        "SELECT id, name, email, phone, address, city, registrationDate, status FROM clientes ORDER BY registrationDate DESC"
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("clientes")
+        .select(
+          "id, name, email, phone, address, city, registrationDate, status"
+        )
+        .order("registrationDate", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error en Client.findAll:", error);
       throw new Error("Error al obtener clientes");
@@ -40,18 +38,18 @@ class Client {
   }
 
   /**
-   * Busca un cliente por su ID
-   * @param {number} id - ID del cliente
-   * @returns {Promise<Object|null>} Cliente encontrado o null
+   * Busca un cliente por ID
    */
   static async findById(id) {
     try {
-      const [rows] = await pool.execute("SELECT * FROM clientes WHERE id = ?", [
-        id,
-      ]);
-      console.log(rows);
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("*")
+        .eq("id", id)
+        .single();
 
-      return rows.length > 0 ? rows[0] : null;
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
     } catch (error) {
       console.error("Error en Client.findById:", error);
       throw new Error("Error al buscar cliente por ID");
@@ -59,17 +57,20 @@ class Client {
   }
 
   /**
-   * Busca un cliente por su email
-   * @param {string} email - Email del cliente
-   * @returns {Promise<Object|null>} Cliente encontrado o null
+   * Busca un cliente por email
    */
   static async findByEmail(email) {
     try {
-      const [rows] = await pool.execute(
-        "SELECT id, name, email, phone, address, city, registrationDate, status FROM clientes WHERE email = ?",
-        [email]
-      );
-      return rows.length > 0 ? rows[0] : null;
+      const { data, error } = await supabase
+        .from("clientes")
+        .select(
+          "id, name, email, phone, address, city, registrationDate, status"
+        )
+        .eq("email", email)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
     } catch (error) {
       console.error("Error en Client.findByEmail:", error);
       throw new Error("Error al buscar cliente por email");
@@ -77,73 +78,87 @@ class Client {
   }
 
   /**
-   * Crea un nuevo cliente en la base de datos
-   * @param {Object} clientData - Datos del cliente
-   * @returns {Promise<Object>} Cliente creado
+   * Crea un nuevo cliente
    */
   static async create(clientData) {
     try {
       const { id, name, email, phone, address, city, status } = clientData;
 
-      const [result] = await pool.execute(
-        "INSERT INTO clientes (id,name, email, phone, address, city, status, registrationDate) VALUES (?,?, ?, ?, ?, ?, ?, NOW())",
-        [id, name, email, phone, address, city, status || "Activo"]
-      );
+      const { data, error } = await supabase
+        .from("clientes")
+        .insert([
+          {
+            id,
+            name,
+            email,
+            phone,
+            address,
+            city,
+            status: status || "Activo",
+            registrationDate: new Date().toISOString(),
+          },
+        ])
+        .select()
+        .single();
 
-      // Obtener el cliente recién creado
-      const newClient = await this.findById(result.insertId);
-      return newClient;
+      if (error) {
+        if (error.code === "23505") {
+          throw new Error("El email ya está registrado");
+        }
+        throw error;
+      }
+
+      return data;
     } catch (error) {
       console.error("Error en Client.create:", error);
-      if (error.code === "ER_DUP_ENTRY") {
-        throw new Error("El email ya está registrado");
-      }
-      throw new Error("Error al crear cliente");
+      throw error;
     }
   }
 
   /**
    * Actualiza un cliente existente
-   * @param {number} id - ID del cliente
-   * @param {Object} clientData - Datos a actualizar
-   * @returns {Promise<Object|null>} Cliente actualizado o null
    */
   static async update(id, clientData) {
     try {
       const { name, email, phone, address, city, status } = clientData;
 
-      const [result] = await pool.execute(
-        "UPDATE clientes SET name = ?, email = ?, phone = ?, address = ?, city = ?, status = ? WHERE id = ?",
-        [name, email, phone, address, city, status, id]
-      );
+      const { data, error } = await supabase
+        .from("clientes")
+        .update({
+          name,
+          email,
+          phone,
+          address,
+          city,
+          status,
+        })
+        .eq("id", id)
+        .select()
+        .single();
 
-      if (result.affectedRows === 0) {
-        return null;
+      if (error) {
+        if (error.code === "23505") {
+          throw new Error("El email ya está registrado");
+        }
+        throw error;
       }
 
-      // Obtener el cliente actualizado
-      const updatedClient = await this.findById(id);
-      return updatedClient;
+      return data;
     } catch (error) {
       console.error("Error en Client.update:", error);
-      if (error.code === "ER_DUP_ENTRY") {
-        throw new Error("El email ya está registrado");
-      }
-      throw new Error("Error al actualizar cliente");
+      throw error;
     }
   }
 
   /**
-   * Elimina un cliente por su ID
-   * @param {number} id - ID del cliente
-   * @returns {Promise<boolean>} True si se eliminó correctamente
+   * Elimina un cliente
    */
   static async delete(id) {
     try {
-      const [result] = await pool.execute("DELETE FROM clientes WHERE id = ?", [
-        id,
-      ]);
-      return result.affectedRows > 0;
+      const { error } = await supabase.from("clientes").delete().eq("id", id);
+
+      if (error) throw error;
+      return true;
     } catch (error) {
       console.error("Error en Client.delete:", error);
       throw new Error("Error al eliminar cliente");
@@ -151,17 +166,22 @@ class Client {
   }
 
   /**
-   * Busca clientes por nombre, email o teléfono (búsqueda parcial)
-   * @param {string} searchTerm - Término a buscar
-   * @returns {Promise<Array>} Array de clientes encontrados
+   * Busca clientes por nombre, email o teléfono
    */
   static async searchByName(searchTerm) {
     try {
-      const [rows] = await pool.execute(
-        "SELECT id, name, email, phone, address, city, registrationDate, status FROM clientes WHERE name LIKE ? OR email LIKE ? OR phone LIKE ? ORDER BY name",
-        [`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`]
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("clientes")
+        .select(
+          "id, name, email, phone, address, city, registrationDate, status"
+        )
+        .or(
+          `name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`
+        )
+        .order("name");
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error en Client.searchByName:", error);
       throw new Error("Error al buscar clientes por nombre");
@@ -170,14 +190,15 @@ class Client {
 
   /**
    * Cuenta el total de clientes
-   * @returns {Promise<number>} Número total de clientes
    */
   static async count() {
     try {
-      const [rows] = await pool.execute(
-        "SELECT COUNT(*) as total FROM clientes"
-      );
-      return rows[0].total;
+      const { count, error } = await supabase
+        .from("clientes")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      return count || 0;
     } catch (error) {
       console.error("Error en Client.count:", error);
       throw new Error("Error al contar clientes");
@@ -186,34 +207,38 @@ class Client {
 
   /**
    * Obtiene clientes con paginación
-   * @param {number} page - Número de página (empezando en 1)
-   * @param {number} limit - Límite de clientes por página
-   * @returns {Promise<Object>} Objeto con clientes y metadatos de paginación
    */
   static async paginate(page = 1, limit = 10) {
     try {
       const pageInt = parseInt(page) || 1;
       let limitInt = parseInt(limit) || 10;
-      const offset = (pageInt - 1) * limitInt;
 
-      // Validar parámetros
       if (limitInt < 1) limitInt = 10;
-      if (limitInt > 100) limitInt = 100; // Límite máximo
+      if (limitInt > 100) limitInt = 100;
 
-      // Obtener clientes paginados
-      const [clients] = await pool.execute(
-        `SELECT id, name, email, phone, address, city, registrationDate, status 
-         FROM clientes 
-         ORDER BY registrationDate DESC 
-         LIMIT ${limitInt} OFFSET ${offset}`
-      );
+      const from = (pageInt - 1) * limitInt;
+      const to = from + limitInt - 1;
 
-      // Obtener total de clientes
-      const total = await this.count();
+      const {
+        data: clients,
+        error,
+        count,
+      } = await supabase
+        .from("clientes")
+        .select(
+          "id, name, email, phone, address, city, registrationDate, status",
+          { count: "exact" }
+        )
+        .order("registrationDate", { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      const total = count || 0;
       const totalPages = Math.ceil(total / limitInt);
 
       return {
-        clients,
+        clients: clients || [],
         pagination: {
           currentPage: pageInt,
           totalPages,
@@ -225,7 +250,6 @@ class Client {
       };
     } catch (error) {
       console.error("Error en Client.paginate:", error);
-      console.error("Detalles del error:", error.stack);
       throw new Error("Error al paginar clientes");
     }
   }

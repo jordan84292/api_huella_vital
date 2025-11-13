@@ -1,4 +1,8 @@
-const { pool } = require("../config/database");
+/**
+ * Modelo de Visita con Supabase
+ */
+
+const { supabase } = require("../config/database");
 
 class Visit {
   constructor(visitData) {
@@ -17,10 +21,13 @@ class Visit {
 
   static async findAll() {
     try {
-      const [rows] = await pool.execute(
-        `SELECT * FROM visits ORDER BY date DESC`
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("visits")
+        .select("*")
+        .order("date", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error en Visit.findAll:", error);
       throw new Error("Error al obtener visitas");
@@ -29,10 +36,14 @@ class Visit {
 
   static async findById(id) {
     try {
-      const [rows] = await pool.execute(`SELECT * FROM visits WHERE id = ?`, [
-        id,
-      ]);
-      return rows.length > 0 ? rows[0] : null;
+      const { data, error } = await supabase
+        .from("visits")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
     } catch (error) {
       console.error("Error en Visit.findById:", error);
       throw new Error("Error al buscar visita por ID");
@@ -41,11 +52,14 @@ class Visit {
 
   static async findByPatientId(patientId) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT * FROM visits WHERE patientId = ? ORDER BY date DESC`,
-        [patientId]
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("visits")
+        .select("*")
+        .eq("patientId", patientId)
+        .order("date", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error en Visit.findByPatientId:", error);
       throw new Error("Error al buscar visitas por paciente");
@@ -65,29 +79,39 @@ class Visit {
         cost,
       } = visitData;
 
-      const [result] = await pool.execute(
-        `INSERT INTO visits 
-         (patientId, date, type, veterinarian, diagnosis, treatment, notes, cost, created_date, updated_date) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          patientId,
-          date,
-          type,
-          veterinarian,
-          diagnosis,
-          treatment,
-          notes || null,
-          cost,
-        ]
-      );
+      const now = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from("visits")
+        .insert([
+          {
+            patientId,
+            date,
+            type,
+            veterinarian,
+            diagnosis,
+            treatment,
+            notes: notes || null,
+            cost,
+            created_date: now,
+            updated_date: now,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
 
       // Actualizar lastVisit del paciente
-      await pool.execute(
-        `UPDATE patients SET lastVisit = DATE(?), updated_date = NOW() WHERE id = ?`,
-        [date, patientId]
-      );
+      await supabase
+        .from("patients")
+        .update({
+          lastVisit: date,
+          updated_date: now,
+        })
+        .eq("id", patientId);
 
-      return await this.findById(result.insertId);
+      return await this.findById(data.id);
     } catch (error) {
       console.error("Error en Visit.create:", error);
       throw new Error("Error al crear visita");
@@ -107,12 +131,9 @@ class Visit {
         cost,
       } = visitData;
 
-      const [result] = await pool.execute(
-        `UPDATE visits 
-         SET patientId = ?, date = ?, type = ?, veterinarian = ?, 
-             diagnosis = ?, treatment = ?, notes = ?, cost = ?, updated_date = NOW()
-         WHERE id = ?`,
-        [
+      const { data, error } = await supabase
+        .from("visits")
+        .update({
           patientId,
           date,
           type,
@@ -121,13 +142,14 @@ class Visit {
           treatment,
           notes,
           cost,
-          id,
-        ]
-      );
+          updated_date: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
 
-      if (result.affectedRows === 0) {
-        return null;
-      }
+      if (error) throw error;
+      if (!data) return null;
 
       return await this.findById(id);
     } catch (error) {
@@ -138,10 +160,10 @@ class Visit {
 
   static async delete(id) {
     try {
-      const [result] = await pool.execute("DELETE FROM visits WHERE id = ?", [
-        id,
-      ]);
-      return result.affectedRows > 0;
+      const { error } = await supabase.from("visits").delete().eq("id", id);
+
+      if (error) throw error;
+      return true;
     } catch (error) {
       console.error("Error en Visit.delete:", error);
       throw new Error("Error al eliminar visita");
@@ -150,13 +172,35 @@ class Visit {
 
   static async getStatsByType() {
     try {
-      const [rows] = await pool.execute(
-        `SELECT type, COUNT(*) as count, SUM(cost) as totalRevenue, AVG(cost) as avgCost 
-         FROM visits 
-         GROUP BY type 
-         ORDER BY count DESC`
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("visits")
+        .select("type, cost")
+        .order("type");
+
+      if (error) throw error;
+
+      const stats = {};
+      (data || []).forEach((row) => {
+        if (!stats[row.type]) {
+          stats[row.type] = {
+            count: 0,
+            totalRevenue: 0,
+            costs: [],
+          };
+        }
+        stats[row.type].count++;
+        stats[row.type].totalRevenue += parseFloat(row.cost || 0);
+        stats[row.type].costs.push(parseFloat(row.cost || 0));
+      });
+
+      return Object.entries(stats)
+        .map(([type, data]) => ({
+          type,
+          count: data.count,
+          totalRevenue: data.totalRevenue,
+          avgCost: data.totalRevenue / data.count,
+        }))
+        .sort((a, b) => b.count - a.count);
     } catch (error) {
       console.error("Error en Visit.getStatsByType:", error);
       throw new Error("Error al obtener estadísticas por tipo");
@@ -165,8 +209,12 @@ class Visit {
 
   static async count() {
     try {
-      const [rows] = await pool.execute("SELECT COUNT(*) as total FROM visits");
-      return rows[0].total;
+      const { count, error } = await supabase
+        .from("visits")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      return count || 0;
     } catch (error) {
       console.error("Error en Visit.count:", error);
       throw new Error("Error al contar visitas");

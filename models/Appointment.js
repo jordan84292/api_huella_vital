@@ -1,4 +1,8 @@
-const { pool } = require("../config/database");
+/**
+ * Modelo de Cita con Supabase
+ */
+
+const { supabase } = require("../config/database");
 
 class Appointment {
   constructor(appointmentData) {
@@ -16,17 +20,27 @@ class Appointment {
 
   static async findAll() {
     try {
-      const [rows] = await pool.execute(
-        `SELECT a.*, 
-                p.name as patientName, 
-                p.species, 
-                c.name as ownerName
-         FROM appointments a
-         LEFT JOIN patients p ON a.patientId = p.id
-         LEFT JOIN clientes c ON p.ownerId = c.id
-         ORDER BY a.date DESC, a.time DESC`
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("appointments")
+        .select(
+          `
+          *,
+          patients!inner(name, species),
+          clientes!inner(name)
+        `
+        )
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
+
+      if (error) throw error;
+
+      // Transformar datos para coincidir con el formato esperado
+      return (data || []).map((appointment) => ({
+        ...appointment,
+        patientName: appointment.patients.name,
+        species: appointment.patients.species,
+        ownerName: appointment.clientes.name,
+      }));
     } catch (error) {
       console.error("Error en Appointment.findAll:", error);
       throw new Error("Error al obtener citas");
@@ -35,18 +49,29 @@ class Appointment {
 
   static async findById(id) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT a.*, 
-                p.name as patientName, 
-                p.species, 
-                c.name as ownerName
-         FROM appointments a
-         LEFT JOIN patients p ON a.patientId = p.id
-         LEFT JOIN clientes c ON p.ownerId = c.id
-         WHERE a.id = ?`,
-        [id]
-      );
-      return rows.length > 0 ? rows[0] : null;
+      const { data, error } = await supabase
+        .from("appointments")
+        .select(
+          `
+          *,
+          patients!inner(name, species),
+          clientes!inner(name)
+        `
+        )
+        .eq("id", id)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error;
+
+      if (data) {
+        return {
+          ...data,
+          patientName: data.patients.name,
+          species: data.patients.species,
+          ownerName: data.clientes.name,
+        };
+      }
+      return null;
     } catch (error) {
       console.error("Error en Appointment.findById:", error);
       throw new Error("Error al buscar cita por ID");
@@ -55,19 +80,27 @@ class Appointment {
 
   static async findByPatientId(patientId) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT a.*, 
-                p.name as patientName, 
-                p.species, 
-                c.name as ownerName
-         FROM appointments a
-         LEFT JOIN patients p ON a.patientId = p.id
-         LEFT JOIN clientes c ON p.ownerId = c.id
-         WHERE a.patientId = ? 
-         ORDER BY a.date DESC, a.time DESC`,
-        [patientId]
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("appointments")
+        .select(
+          `
+          *,
+          patients!inner(name, species),
+          clientes!inner(name)
+        `
+        )
+        .eq("patientId", patientId)
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map((appointment) => ({
+        ...appointment,
+        patientName: appointment.patients.name,
+        species: appointment.patients.species,
+        ownerName: appointment.clientes.name,
+      }));
     } catch (error) {
       console.error("Error en Appointment.findByPatientId:", error);
       throw new Error("Error al buscar citas por paciente");
@@ -76,12 +109,13 @@ class Appointment {
 
   static async findByDate(date) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT * FROM vistacitapacientecliente
-WHERE CAST(date AS DATE) = ? `,
-        [date]
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("vistacitapacientecliente")
+        .select("*")
+        .eq("date", date);
+
+      if (error) throw error;
+      return data || [];
     } catch (error) {
       console.error("Error en Appointment.findByDate:", error);
       throw new Error("Error al buscar citas por fecha");
@@ -90,19 +124,27 @@ WHERE CAST(date AS DATE) = ? `,
 
   static async findByStatus(status) {
     try {
-      const [rows] = await pool.execute(
-        `SELECT a.*, 
-                p.name as patientName, 
-                p.species, 
-                c.name as ownerName
-         FROM appointments a
-         LEFT JOIN patients p ON a.patientId = p.id
-         LEFT JOIN clientes c ON p.ownerId = c.id
-         WHERE a.status = ? 
-         ORDER BY a.date DESC, a.time DESC`,
-        [status]
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("appointments")
+        .select(
+          `
+          *,
+          patients!inner(name, species),
+          clientes!inner(name)
+        `
+        )
+        .eq("status", status)
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map((appointment) => ({
+        ...appointment,
+        patientName: appointment.patients.name,
+        species: appointment.patients.species,
+        ownerName: appointment.clientes.name,
+      }));
     } catch (error) {
       console.error("Error en Appointment.findByStatus:", error);
       throw new Error("Error al buscar citas por estado");
@@ -114,28 +156,37 @@ WHERE CAST(date AS DATE) = ? `,
       const { patientId, date, time, type, veterinarian, status, notes } =
         appointmentData;
 
-      const [result] = await pool.execute(
-        `INSERT INTO appointments 
-         (patientId, date, time, type, veterinarian, status, notes, created_date, updated_date) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          patientId,
-          date,
-          time,
-          type,
-          veterinarian,
-          status || "Programada",
-          notes || null,
-        ]
-      );
+      const now = new Date().toISOString();
 
-      if (status == "Completada") {
-        await pool.execute("Update patients set lastVisit = ? where id = ?", [
-          date,
-          patientId,
-        ]);
+      const { data, error } = await supabase
+        .from("appointments")
+        .insert([
+          {
+            patientId,
+            date,
+            time,
+            type,
+            veterinarian,
+            status: status || "Programada",
+            notes: notes || null,
+            created_date: now,
+            updated_date: now,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Actualizar lastVisit si el status es Completada
+      if (status === "Completada") {
+        await supabase
+          .from("patients")
+          .update({ lastVisit: date })
+          .eq("id", patientId);
       }
-      return await this.findById(result.insertId);
+
+      return await this.findById(data.id);
     } catch (error) {
       console.error("Error en Appointment.create:", error);
       throw new Error("Error al crear cita");
@@ -147,23 +198,33 @@ WHERE CAST(date AS DATE) = ? `,
       const { patientId, date, time, type, veterinarian, status, notes } =
         appointmentData;
 
-      const [result] = await pool.execute(
-        `UPDATE appointments 
-         SET patientId = ?, date = ?, time = ?, type = ?, 
-             veterinarian = ?, status = ?, notes = ?, updated_date = NOW()
-         WHERE id = ?`,
-        [patientId, date, time, type, veterinarian, status, notes, id]
-      );
-
-      if (result.affectedRows === 0) {
-        return null;
-      }
-      if (status == "Completada") {
-        await pool.execute("Update patients set lastVisit = ? where id = ?", [
-          date,
+      const { data, error } = await supabase
+        .from("appointments")
+        .update({
           patientId,
-        ]);
+          date,
+          time,
+          type,
+          veterinarian,
+          status,
+          notes,
+          updated_date: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      // Actualizar lastVisit si el status es Completada
+      if (status === "Completada") {
+        await supabase
+          .from("patients")
+          .update({ lastVisit: date })
+          .eq("id", patientId);
       }
+
       return await this.findById(id);
     } catch (error) {
       console.error("Error en Appointment.update:", error);
@@ -173,11 +234,13 @@ WHERE CAST(date AS DATE) = ? `,
 
   static async delete(id) {
     try {
-      const [result] = await pool.execute(
-        "DELETE FROM appointments WHERE id = ?",
-        [id]
-      );
-      return result.affectedRows > 0;
+      const { error } = await supabase
+        .from("appointments")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      return true;
     } catch (error) {
       console.error("Error en Appointment.delete:", error);
       throw new Error("Error al eliminar cita");
@@ -186,13 +249,21 @@ WHERE CAST(date AS DATE) = ? `,
 
   static async getStatsByType() {
     try {
-      const [rows] = await pool.execute(
-        `SELECT type, COUNT(*) as count 
-         FROM appointments 
-         GROUP BY type 
-         ORDER BY count DESC`
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("type")
+        .order("type");
+
+      if (error) throw error;
+
+      const stats = {};
+      (data || []).forEach((row) => {
+        stats[row.type] = (stats[row.type] || 0) + 1;
+      });
+
+      return Object.entries(stats)
+        .map(([type, count]) => ({ type, count }))
+        .sort((a, b) => b.count - a.count);
     } catch (error) {
       console.error("Error en Appointment.getStatsByType:", error);
       throw new Error("Error al obtener estadísticas por tipo");
@@ -201,12 +272,22 @@ WHERE CAST(date AS DATE) = ? `,
 
   static async getStatsByStatus() {
     try {
-      const [rows] = await pool.execute(
-        `SELECT status, COUNT(*) as count 
-         FROM appointments 
-         GROUP BY status`
-      );
-      return rows;
+      const { data, error } = await supabase
+        .from("appointments")
+        .select("status")
+        .order("status");
+
+      if (error) throw error;
+
+      const stats = {};
+      (data || []).forEach((row) => {
+        stats[row.status] = (stats[row.status] || 0) + 1;
+      });
+
+      return Object.entries(stats).map(([status, count]) => ({
+        status,
+        count,
+      }));
     } catch (error) {
       console.error("Error en Appointment.getStatsByStatus:", error);
       throw new Error("Error al obtener estadísticas por estado");
@@ -215,10 +296,12 @@ WHERE CAST(date AS DATE) = ? `,
 
   static async count() {
     try {
-      const [rows] = await pool.execute(
-        "SELECT COUNT(*) as total FROM appointments"
-      );
-      return rows[0].total;
+      const { count, error } = await supabase
+        .from("appointments")
+        .select("*", { count: "exact", head: true });
+
+      if (error) throw error;
+      return count || 0;
     } catch (error) {
       console.error("Error en Appointment.count:", error);
       throw new Error("Error al contar citas");
@@ -227,11 +310,13 @@ WHERE CAST(date AS DATE) = ? `,
 
   static async countByDate(date) {
     try {
-      const [rows] = await pool.execute(
-        "SELECT COUNT(*) as total FROM appointments WHERE date = ?",
-        [date]
-      );
-      return rows[0].total;
+      const { count, error } = await supabase
+        .from("appointments")
+        .select("*", { count: "exact", head: true })
+        .eq("date", date);
+
+      if (error) throw error;
+      return count || 0;
     } catch (error) {
       console.error("Error en Appointment.countByDate:", error);
       throw new Error("Error al contar citas por fecha");
