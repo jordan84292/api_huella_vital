@@ -31,7 +31,7 @@ class Client {
         .select(
           "id, cedula, name, email, phone, address, city, registrationdate, status",
         )
-        .order("registrationDate", { ascending: false });
+        .order("registrationdate", { ascending: false });
 
       if (error) throw error;
       return data || [];
@@ -177,7 +177,7 @@ class Client {
       const { data, error } = await supabase
         .from("clientes")
         .select(
-          "id, name, email, phone, address, city, registrationDate, status",
+          "id, name, email, phone, address, city, registrationdate, status",
         )
         .or(
           `name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`,
@@ -230,10 +230,10 @@ class Client {
       } = await supabase
         .from("clientes")
         .select(
-          "id, name, email, phone, address, city, registrationDate, status",
+          "id, name, email, phone, address, city, registrationdate, status",
           { count: "exact" },
         )
-        .order("registrationDate", { ascending: false })
+        .order("registrationdate", { ascending: false })
         .range(from, to);
 
       if (error) throw error;
