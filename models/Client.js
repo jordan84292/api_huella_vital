@@ -8,12 +8,15 @@ const { supabase } = require("../config/database");
 class Client {
   constructor(clientData) {
     this.id = clientData.id;
+    this.cedula = clientData.cedula;
     this.name = clientData.name;
     this.email = clientData.email;
     this.phone = clientData.phone;
     this.address = clientData.address;
     this.city = clientData.city;
-    this.registrationDate = clientData.registrationDate;
+    // Acepta registrationdate o registrationDate
+    this.registrationDate =
+      clientData.registrationdate || clientData.registrationDate;
     this.status = clientData.status;
   }
 
@@ -25,7 +28,7 @@ class Client {
       const { data, error } = await supabase
         .from("clientes")
         .select(
-          "id, name, email, phone, address, city, registrationDate, status"
+          "id, cedula, name, email, phone, address, city, registrationdate, status",
         )
         .order("registrationDate", { ascending: false });
 
@@ -64,7 +67,7 @@ class Client {
       const { data, error } = await supabase
         .from("clientes")
         .select(
-          "id, name, email, phone, address, city, registrationDate, status"
+          "id, name, email, phone, address, city, registrationdate, status",
         )
         .eq("email", email)
         .single();
@@ -82,20 +85,20 @@ class Client {
    */
   static async create(clientData) {
     try {
-      const { id, name, email, phone, address, city, status } = clientData;
+      const { cedula, name, email, phone, address, city, status } = clientData;
 
       const { data, error } = await supabase
         .from("clientes")
         .insert([
           {
-            id,
+            cedula,
             name,
             email,
             phone,
             address,
             city,
             status: status || "Activo",
-            registrationDate: new Date().toISOString(),
+            registrationdate: new Date().toISOString(),
           },
         ])
         .select()
@@ -103,7 +106,7 @@ class Client {
 
       if (error) {
         if (error.code === "23505") {
-          throw new Error("El email ya está registrado");
+          throw new Error("El email o la cédula ya está registrado");
         }
         throw error;
       }
@@ -173,10 +176,10 @@ class Client {
       const { data, error } = await supabase
         .from("clientes")
         .select(
-          "id, name, email, phone, address, city, registrationDate, status"
+          "id, name, email, phone, address, city, registrationDate, status",
         )
         .or(
-          `name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`
+          `name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`,
         )
         .order("name");
 
@@ -227,7 +230,7 @@ class Client {
         .from("clientes")
         .select(
           "id, name, email, phone, address, city, registrationDate, status",
-          { count: "exact" }
+          { count: "exact" },
         )
         .order("registrationDate", { ascending: false })
         .range(from, to);

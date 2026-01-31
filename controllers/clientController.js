@@ -118,7 +118,7 @@ class ClientController {
         });
       }
 
-      const { id, name, email, phone, address, city, status } = req.body;
+      const { cedula, name, email, phone, address, city, status } = req.body;
 
       // Verificar si el email ya existe
       const existingClient = await Client.findByEmail(email);
@@ -131,7 +131,7 @@ class ClientController {
 
       // Crear el cliente
       const newClient = await Client.create({
-        id,
+        cedula,
         name,
         email,
         phone,
