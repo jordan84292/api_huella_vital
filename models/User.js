@@ -180,20 +180,18 @@ class User {
   }
 
   /**
-   * Busca un usuario por email con password (para autenticación)
+   * Busca un usuario por email con password (para autenticación) usando función almacenada
    */
   static async findByEmailWithPassword(email) {
     try {
-      const { data, error } = await supabase
-        .from("viewuserrol")
-        .select("*")
-        .eq("email", email)
-        .single();
-
-      if (error && error.code !== "PGRST116") throw error;
-      return data;
+      const { data, error } = await supabase.rpc("find_usuario_by_email", {
+        p_email: email,
+      });
+      if (error) throw error;
+      // La función debe retornar un array, tomamos el primer usuario si existe
+      return data && data.length > 0 ? data[0] : null;
     } catch (error) {
-      console.error("Error en User.findByEmailWithPassword:", error);
+      console.error("Error en User.findByEmailWithPassword (RPC):", error);
       throw new Error("Error al buscar usuario por email");
     }
   }

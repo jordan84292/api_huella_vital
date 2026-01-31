@@ -74,6 +74,11 @@ BEGIN
     fecha_actualizacion = NOW()
   WHERE usuarios.id = p_id
   RETURNING usuarios.id, usuarios.nombre, usuarios.email, usuarios.telefono, usuarios.rol, usuarios.status, usuarios.fecha_creacion, usuarios.fecha_actualizacion;
+
+  -- Si no se actualizó ninguna fila, devolver un error explícito
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'No se encontró el usuario con el ID %', p_id;
+  END IF;
 END;
 $$;
 
