@@ -146,13 +146,20 @@ class PatientController {
         status,
       } = req.body;
 
-      // Verificar que el propietario existe
-      const [ownerExists] = await pool.execute(
-        "SELECT id FROM clientes WHERE id = ?",
-        [ownerId]
-      );
+      // Verificar que el propietario existe (Supabase)
+      const { data: ownerExists, error: ownerError } = await supabase
+        .from("clientes")
+        .select("id")
+        .eq("id", ownerId);
 
-      if (ownerExists.length === 0) {
+      if (ownerError) {
+        return res.status(500).json({
+          success: false,
+          message: "Error al verificar propietario",
+          error: ownerError.message,
+        });
+      }
+      if (!ownerExists || ownerExists.length === 0) {
         return res.status(400).json({
           success: false,
           message: "El propietario seleccionado no existe",
@@ -249,13 +256,20 @@ class PatientController {
         });
       }
 
-      // Verificar que el propietario existe
-      const [ownerExists] = await pool.execute(
-        "SELECT id FROM clientes WHERE id = ?",
-        [ownerId]
-      );
+      // Verificar que el propietario existe (Supabase)
+      const { data: ownerExists, error: ownerError } = await supabase
+        .from("clientes")
+        .select("id")
+        .eq("id", ownerId);
 
-      if (ownerExists.length === 0) {
+      if (ownerError) {
+        return res.status(500).json({
+          success: false,
+          message: "Error al verificar propietario",
+          error: ownerError.message,
+        });
+      }
+      if (!ownerExists || ownerExists.length === 0) {
         return res.status(400).json({
           success: false,
           message: "El propietario seleccionado no existe",
