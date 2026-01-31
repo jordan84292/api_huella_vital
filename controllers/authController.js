@@ -224,14 +224,34 @@ class AuthController {
         });
       }
 
-      // Crear objeto con solo los campos a actualizar
-      const updateData = {
-        nombre: nombre || existingUser.nombre,
-        email: email || existingUser.email,
-        telefono: telefono || existingUser.telefono,
-        rolName: rolName || existingUser.rolName,
-        status: status || existingUser.status,
-      };
+      console.log("Usuario existente:", existingUser);
+      console.log("Datos recibidos:", {
+        nombre,
+        email,
+        telefono,
+        rolName,
+        status,
+        hasNewPassword: !!newPassword,
+      });
+
+      // Crear objeto con solo los campos que realmente cambian
+      const updateData = {};
+
+      if (nombre && nombre !== existingUser.nombre) {
+        updateData.nombre = nombre;
+      }
+      if (email && email !== existingUser.email) {
+        updateData.email = email;
+      }
+      if (telefono && telefono !== existingUser.telefono) {
+        updateData.telefono = telefono;
+      }
+      if (rolName && rolName !== existingUser.rolName) {
+        updateData.rolName = rolName;
+      }
+      if (status && status !== existingUser.status) {
+        updateData.status = status;
+      }
 
       // Si se quiere cambiar la contraseña
       if (newPassword) {
@@ -258,11 +278,22 @@ class AuthController {
         // Hashear nueva contraseña
         const saltRounds = 12;
         updateData.password = await bcrypt.hash(newPassword, saltRounds);
+        console.log("Nueva contraseña hasheada y agregada a updateData");
+      }
+
+      console.log("Datos a actualizar:", Object.keys(updateData));
+
+      // Si no hay cambios, retornar error
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No hay cambios para actualizar",
+        });
       }
 
       // Verificar si el email ya existe en otro usuario
-      if (email && email !== existingUser.email) {
-        const emailUser = await User.findByEmail(email);
+      if (updateData.email && updateData.email !== existingUser.email) {
+        const emailUser = await User.findByEmail(updateData.email);
         if (emailUser && emailUser.id !== userId) {
           return res.status(409).json({
             success: false,
@@ -270,6 +301,17 @@ class AuthController {
           });
         }
       }
+
+      // Si solo se actualiza la contraseña, incluir los otros campos obligatorios
+      if (updateData.password && Object.keys(updateData).length === 1) {
+        updateData.nombre = existingUser.nombre;
+        updateData.email = existingUser.email;
+        updateData.telefono = existingUser.telefono;
+        updateData.rolName = existingUser.rolName;
+        updateData.status = existingUser.status;
+      }
+
+      console.log("UpdateData final:", updateData);
 
       // Actualizar el usuario
       const updatedUser = await User.update(userId, updateData);
