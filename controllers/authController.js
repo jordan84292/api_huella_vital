@@ -60,7 +60,7 @@ class AuthController {
           email: newUser.email,
         },
         process.env.JWT_SECRET || "default_secret_key",
-        { expiresIn: process.env.JWT_EXPIRES_IN || "24h" }
+        { expiresIn: process.env.JWT_EXPIRES_IN || "24h" },
       );
 
       res.status(201).json({
@@ -128,7 +128,7 @@ class AuthController {
           email: user.email,
         },
         process.env.JWT_SECRET || "default_secret_key",
-        { expiresIn: process.env.JWT_EXPIRES_IN || "24h" }
+        { expiresIn: process.env.JWT_EXPIRES_IN || "24h" },
       );
 
       // Remover password del objeto user antes de enviarlo
@@ -205,8 +205,15 @@ class AuthController {
       }
 
       const userId = req.user.userId;
-      const { nombre, email, telefono, currentPassword, newPassword } =
-        req.body;
+      const {
+        nombre,
+        email,
+        telefono,
+        currentPassword,
+        newPassword,
+        rolName,
+        status,
+      } = req.body;
 
       // Verificar si el usuario existe
       const existingUser = await User.findByEmailWithPassword(req.user.email);
@@ -217,7 +224,14 @@ class AuthController {
         });
       }
 
-      let updateData = existingUser;
+      // Crear objeto con solo los campos a actualizar
+      const updateData = {
+        nombre: nombre || existingUser.nombre,
+        email: email || existingUser.email,
+        telefono: telefono || existingUser.telefono,
+        rolName: rolName || existingUser.rolName,
+        status: status || existingUser.status,
+      };
 
       // Si se quiere cambiar la contraseña
       if (newPassword) {
@@ -232,7 +246,7 @@ class AuthController {
         // Verificar contraseña actual
         const isCurrentPasswordValid = await bcrypt.compare(
           currentPassword,
-          existingUser.password
+          existingUser.password,
         );
         if (!isCurrentPasswordValid) {
           return res.status(401).json({
@@ -247,7 +261,7 @@ class AuthController {
       }
 
       // Verificar si el email ya existe en otro usuario
-      if (email !== existingUser.email) {
+      if (email && email !== existingUser.email) {
         const emailUser = await User.findByEmail(email);
         if (emailUser && emailUser.id !== userId) {
           return res.status(409).json({
@@ -290,7 +304,7 @@ class AuthController {
       const newToken = jwt.sign(
         { userId, email },
         process.env.JWT_SECRET || "default_secret_key",
-        { expiresIn: process.env.JWT_EXPIRES_IN || "24h" }
+        { expiresIn: process.env.JWT_EXPIRES_IN || "24h" },
       );
 
       res.status(200).json({
