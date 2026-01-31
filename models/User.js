@@ -42,9 +42,9 @@ class User {
   static async findById(id) {
     try {
       const { data, error } = await supabase
-        .from("viewuserrol")
+        .from("usuarios")
         .select(
-          "id, nombre, email, telefono, rolName, status, fecha_creacion, fecha_actualizacion",
+          "id, nombre, email, telefono, rol, status, fecha_creacion, fecha_actualizacion",
         )
         .eq("id", id)
         .single();
@@ -271,8 +271,11 @@ class User {
         error,
         count,
       } = await supabase
-        .from("viewuserrol")
-        .select("*", { count: "exact" })
+        .from("usuarios")
+        .select(
+          "id, nombre, email, telefono, rol, status, fecha_creacion, fecha_actualizacion",
+          { count: "exact" },
+        )
         .order("fecha_creacion", { ascending: false })
         .range(from, to);
 
