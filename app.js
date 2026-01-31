@@ -45,11 +45,11 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.use(
   cors({
-    origin: "https://huella-vital-veterinaria.vercel.app",
+    origin: "http://localhost:3000",
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 
 // Middlewares personalizados
@@ -224,10 +224,10 @@ const initializeApp = async () => {
     if (!dbConnected) {
       console.error("❌ No se pudo conectar a la base de datos");
       console.log(
-        "💡 Asegúrate de que MySQL esté ejecutándose y las credenciales sean correctas"
+        "💡 Asegúrate de que MySQL esté ejecutándose y las credenciales sean correctas",
       );
       console.log(
-        "💡 Revisa el archivo .env para la configuración de la base de datos"
+        "💡 Revisa el archivo .env para la configuración de la base de datos",
       );
     }
 
