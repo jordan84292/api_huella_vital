@@ -7,8 +7,9 @@ const { supabase } = require("../config/database");
 
 class Client {
   constructor(clientData) {
+    // Permitir que id sea alias de cedula
+    this.cedula = clientData.cedula || clientData.id;
     this.id = clientData.id;
-    this.cedula = clientData.cedula;
     this.name = clientData.name;
     this.email = clientData.email;
     this.phone = clientData.phone;

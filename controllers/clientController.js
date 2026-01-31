@@ -118,7 +118,10 @@ class ClientController {
         });
       }
 
-      const { cedula, name, email, phone, address, city, status } = req.body;
+      // Permitir que el frontend envíe 'id' como alias de 'cedula'
+      const { id, cedula, name, email, phone, address, city, status } =
+        req.body;
+      const cedulaFinal = cedula || id;
 
       // Verificar si el email ya existe
       const existingClient = await Client.findByEmail(email);
@@ -131,7 +134,7 @@ class ClientController {
 
       // Crear el cliente
       const newClient = await Client.create({
-        cedula,
+        cedula: cedulaFinal,
         name,
         email,
         phone,
