@@ -34,7 +34,7 @@ class Patient {
           id, name, species, breed, age, weight, gender, birthDate,
           ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
           created_date, updated_date
-        `
+        `,
         )
         .order("created_date", { ascending: false });
 
@@ -55,7 +55,7 @@ class Patient {
           id, name, species, breed, age, weight, gender, birthDate,
           ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
           created_date, updated_date
-        `
+        `,
         )
         .eq("id", id)
         .single();
@@ -77,7 +77,7 @@ class Patient {
           id, name, species, breed, age, weight, gender, birthDate,
           ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
           created_date, updated_date
-        `
+        `,
         )
         .eq("ownerId", ownerId)
         .order("name");
@@ -99,7 +99,7 @@ class Patient {
           id, name, species, breed, age, weight, gender, birthDate,
           ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
           created_date, updated_date
-        `
+        `,
         )
         .eq("microchip", microchip)
         .single();
@@ -130,41 +130,29 @@ class Patient {
         status,
       } = patientData;
 
-      const now = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from("patients")
-        .insert([
-          {
-            name,
-            species,
-            breed,
-            age,
-            weight,
-            gender,
-            birthDate: birthDate || null,
-            ownerId,
-            lastVisit: now,
-            nextVisit: nextVisit || null,
-            microchip: microchip || null,
-            color: color || null,
-            allergies: allergies || null,
-            status: status || "Activo",
-            created_date: now,
-            updated_date: now,
-          },
-        ])
-        .select()
-        .single();
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("create_patient", {
+        p_name: name,
+        p_species: species,
+        p_breed: breed,
+        p_gender: gender,
+        p_birthdate: birthDate || null,
+        p_weight: weight || null,
+        p_ownerid: ownerId,
+        p_microchip: microchip || null,
+        p_color: color || null,
+        p_allergies: allergies || null,
+        p_status: status || "Activo",
+      });
 
       if (error) {
-        if (error.code === "23505") {
+        if (error.code === "23505" || error.message?.includes("duplicate")) {
           throw new Error("El microchip ya está registrado");
         }
         throw error;
       }
 
-      return data;
+      return Array.isArray(data) ? data[0] : data;
     } catch (error) {
       console.error("Error en Patient.create:", error);
       throw error;
@@ -190,37 +178,29 @@ class Patient {
         status,
       } = patientData;
 
-      const { data, error } = await supabase
-        .from("patients")
-        .update({
-          name,
-          species,
-          breed,
-          age,
-          weight,
-          gender,
-          birthDate: birthDate || null,
-          ownerId,
-          lastVisit: lastVisit || null,
-          nextVisit: nextVisit || null,
-          microchip: microchip || null,
-          color: color || null,
-          allergies: allergies || null,
-          status,
-          updated_date: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select()
-        .single();
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("update_patient", {
+        p_id: id,
+        p_name: name || null,
+        p_species: species || null,
+        p_breed: breed || null,
+        p_gender: gender || null,
+        p_birthdate: birthDate || null,
+        p_weight: weight || null,
+        p_microchip: microchip || null,
+        p_color: color || null,
+        p_allergies: allergies || null,
+        p_status: status || null,
+      });
 
       if (error) {
-        if (error.code === "23505") {
+        if (error.code === "23505" || error.message?.includes("duplicate")) {
           throw new Error("El microchip ya está registrado");
         }
         throw error;
       }
 
-      return data;
+      return Array.isArray(data) ? data[0] : data;
     } catch (error) {
       console.error("Error en Patient.update:", error);
       throw error;
@@ -229,10 +209,13 @@ class Patient {
 
   static async delete(id) {
     try {
-      const { error } = await supabase.from("patients").delete().eq("id", id);
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("delete_patient", {
+        p_id: id,
+      });
 
       if (error) throw error;
-      return true;
+      return data === true;
     } catch (error) {
       console.error("Error en Patient.delete:", error);
       throw new Error("Error al eliminar paciente");
@@ -248,7 +231,7 @@ class Patient {
           id, name, species, breed, age, weight, gender, birthDate,
           ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
           created_date, updated_date
-        `
+        `,
         )
         .ilike("name", `%${name}%`)
         .order("name");
@@ -294,7 +277,7 @@ class Patient {
           ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
           created_date, updated_date
         `,
-          { count: "exact" }
+          { count: "exact" },
         )
         .order("created_date", { ascending: false })
         .range(from, to);

@@ -71,47 +71,38 @@ class Visit {
       const {
         patientId,
         date,
-        type,
+        reason,
         veterinarian,
         diagnosis,
         treatment,
         notes,
-        cost,
       } = visitData;
 
-      const now = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from("visits")
-        .insert([
-          {
-            patientId,
-            date,
-            type,
-            veterinarian,
-            diagnosis,
-            treatment,
-            notes: notes || null,
-            cost,
-            created_date: now,
-            updated_date: now,
-          },
-        ])
-        .select()
-        .single();
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("create_visit", {
+        p_patientid: patientId,
+        p_date: date,
+        p_reason: reason,
+        p_diagnosis: diagnosis,
+        p_treatment: treatment,
+        p_veterinarian: veterinarian || null,
+        p_notes: notes || null,
+      });
 
       if (error) throw error;
+
+      const newVisit = Array.isArray(data) ? data[0] : data;
 
       // Actualizar lastVisit del paciente
       await supabase
         .from("patients")
         .update({
           lastVisit: date,
-          updated_date: now,
+          updated_date: new Date().toISOString(),
         })
         .eq("id", patientId);
 
-      return await this.findById(data.id);
+      return newVisit?.id ? await this.findById(newVisit.id) : newVisit;
     } catch (error) {
       console.error("Error en Visit.create:", error);
       throw new Error("Error al crear visita");
@@ -123,33 +114,26 @@ class Visit {
       const {
         patientId,
         date,
-        type,
+        reason,
         veterinarian,
         diagnosis,
         treatment,
         notes,
-        cost,
       } = visitData;
 
-      const { data, error } = await supabase
-        .from("visits")
-        .update({
-          patientId,
-          date,
-          type,
-          veterinarian,
-          diagnosis,
-          treatment,
-          notes,
-          cost,
-          updated_date: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select()
-        .single();
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("update_visit", {
+        p_id: id,
+        p_date: date || null,
+        p_reason: reason || null,
+        p_diagnosis: diagnosis || null,
+        p_treatment: treatment || null,
+        p_veterinarian: veterinarian || null,
+        p_notes: notes || null,
+      });
 
       if (error) throw error;
-      if (!data) return null;
+      if (!data || (Array.isArray(data) && data.length === 0)) return null;
 
       return await this.findById(id);
     } catch (error) {
@@ -160,10 +144,13 @@ class Visit {
 
   static async delete(id) {
     try {
-      const { error } = await supabase.from("visits").delete().eq("id", id);
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("delete_visit", {
+        p_id: id,
+      });
 
       if (error) throw error;
-      return true;
+      return data === true;
     } catch (error) {
       console.error("Error en Visit.delete:", error);
       throw new Error("Error al eliminar visita");

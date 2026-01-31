@@ -40,7 +40,7 @@ class Appointment {
           *,
           patients!inner(name, species),
           clientes!inner(name)
-        `
+        `,
         )
         .eq("id", id)
         .single();
@@ -71,7 +71,7 @@ class Appointment {
           *,
           patients!inner(name, species),
           clientes!inner(name)
-        `
+        `,
         )
         .eq("patientId", patientId)
         .order("date", { ascending: false })
@@ -115,7 +115,7 @@ class Appointment {
           *,
           patients!inner(name, species),
           clientes!inner(name)
-        `
+        `,
         )
         .eq("status", status)
         .order("date", { ascending: false })
@@ -140,37 +140,32 @@ class Appointment {
       const { patientId, date, time, type, veterinarian, status, notes } =
         appointmentData;
 
-      const now = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from("appointments")
-        .insert([
-          {
-            patientId,
-            date,
-            time,
-            type,
-            veterinarian,
-            status: status || "Programada",
-            notes: notes || null,
-            created_date: now,
-            updated_date: now,
-          },
-        ])
-        .select()
-        .single();
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("create_appointment", {
+        p_patientid: patientId,
+        p_date: date,
+        p_time: time,
+        p_type: type,
+        p_veterinarian: veterinarian,
+        p_status: status || "Programada",
+        p_notes: notes || null,
+      });
 
       if (error) throw error;
 
+      const newAppointment = Array.isArray(data) ? data[0] : data;
+
       // Actualizar lastVisit si el status es Completada
-      if (status === "Completada") {
+      if (status === "Completada" && newAppointment?.id) {
         await supabase
           .from("patients")
           .update({ lastVisit: date })
           .eq("id", patientId);
       }
 
-      return await this.findById(data.id);
+      return newAppointment?.id
+        ? await this.findById(newAppointment.id)
+        : newAppointment;
     } catch (error) {
       console.error("Error en Appointment.create:", error);
       throw new Error("Error al crear cita");
@@ -182,27 +177,22 @@ class Appointment {
       const { patientId, date, time, type, veterinarian, status, notes } =
         appointmentData;
 
-      const { data, error } = await supabase
-        .from("appointments")
-        .update({
-          patientId,
-          date,
-          time,
-          type,
-          veterinarian,
-          status,
-          notes,
-          updated_date: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select()
-        .single();
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("update_appointment", {
+        p_id: id,
+        p_date: date || null,
+        p_time: time || null,
+        p_type: type || null,
+        p_veterinarian: veterinarian || null,
+        p_status: status || null,
+        p_notes: notes || null,
+      });
 
       if (error) throw error;
-      if (!data) return null;
+      if (!data || (Array.isArray(data) && data.length === 0)) return null;
 
       // Actualizar lastVisit si el status es Completada
-      if (status === "Completada") {
+      if (status === "Completada" && patientId) {
         await supabase
           .from("patients")
           .update({ lastVisit: date })
@@ -218,13 +208,13 @@ class Appointment {
 
   static async delete(id) {
     try {
-      const { error } = await supabase
-        .from("appointments")
-        .delete()
-        .eq("id", id);
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("delete_appointment", {
+        p_id: id,
+      });
 
       if (error) throw error;
-      return true;
+      return data === true;
     } catch (error) {
       console.error("Error en Appointment.delete:", error);
       throw new Error("Error al eliminar cita");

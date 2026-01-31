@@ -24,7 +24,7 @@ class User {
       const { data, error } = await supabase
         .from("usuarios")
         .select(
-          "id, nombre, email, telefono, fecha_creacion, fecha_actualizacion"
+          "id, nombre, email, telefono, fecha_creacion, fecha_actualizacion",
         )
         .order("fecha_creacion", { ascending: false });
 
@@ -44,7 +44,7 @@ class User {
       const { data, error } = await supabase
         .from("viewuserrol")
         .select(
-          "id, nombre, email, telefono, rolName, status, fecha_creacion, fecha_actualizacion"
+          "id, nombre, email, telefono, rolName, status, fecha_creacion, fecha_actualizacion",
         )
         .eq("id", id)
         .single();
@@ -65,7 +65,7 @@ class User {
       const { data, error } = await supabase
         .from("usuarios")
         .select(
-          "id, nombre, email, telefono, fecha_creacion, fecha_actualizacion"
+          "id, nombre, email, telefono, fecha_creacion, fecha_actualizacion",
         )
         .eq("email", email)
         .single();
@@ -97,38 +97,36 @@ class User {
         Recepcionista: "3",
         Asistente: "4",
       };
-      const rol = roleMap[rolName];
+      const rol = roleMap[rolName] || "4";
 
-      const { data, error } = await supabase
-        .from("usuarios")
-        .insert([
-          {
-            nombre,
-            email,
-            telefono,
-            rol,
-            status,
-            password,
-            fecha_creacion: new Date().toISOString(),
-            fecha_actualizacion: new Date().toISOString(),
-          },
-        ])
-        .select()
-        .single();
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("create_usuario", {
+        p_nombre: nombre,
+        p_email: email,
+        p_telefono: telefono,
+        p_password: password,
+        p_rol: rol,
+        p_status: status || "Activo",
+      });
 
       if (error) {
-        if (error.code === "23505") {
-          // Unique violation
+        if (error.code === "23505" || error.message?.includes("duplicate")) {
           throw new Error("El email ya está registrado");
         }
         throw error;
       }
 
-      const newUser = await this.findById(data.id);
-      if (newUser) {
-        delete newUser.password;
+      // data es un array con un solo elemento cuando se usa RPC
+      const newUserId = Array.isArray(data) ? data[0]?.id : data?.id;
+      if (newUserId) {
+        const newUser = await this.findById(newUserId);
+        if (newUser) {
+          delete newUser.password;
+        }
+        return newUser;
       }
-      return newUser;
+
+      return data;
     } catch (error) {
       console.error("Error en User.create:", error);
       throw error;
@@ -148,36 +146,27 @@ class User {
         Recepcionista: "3",
         Asistente: "4",
       };
-      const rol = roleMap[rolName];
+      const rol = rolName ? roleMap[rolName] : null;
 
-      const updateData = {
-        nombre,
-        email,
-        telefono,
-        rol,
-        status,
-        fecha_actualizacion: new Date().toISOString(),
-      };
-
-      if (password) {
-        updateData.password = password;
-      }
-
-      const { data, error } = await supabase
-        .from("usuarios")
-        .update(updateData)
-        .eq("id", id)
-        .select()
-        .single();
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("update_usuario", {
+        p_id: id,
+        p_nombre: nombre || null,
+        p_email: email || null,
+        p_telefono: telefono || null,
+        p_password: password || null,
+        p_rol: rol,
+        p_status: status || null,
+      });
 
       if (error) {
-        if (error.code === "23505") {
+        if (error.code === "23505" || error.message?.includes("duplicate")) {
           throw new Error("El email ya está registrado");
         }
         throw error;
       }
 
-      if (!data) return null;
+      if (!data || (Array.isArray(data) && data.length === 0)) return null;
 
       const updatedUser = await this.findById(id);
       if (updatedUser) {
@@ -214,10 +203,13 @@ class User {
    */
   static async delete(id) {
     try {
-      const { error } = await supabase.from("usuarios").delete().eq("id", id);
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("delete_usuario", {
+        p_id: id,
+      });
 
       if (error) throw error;
-      return true;
+      return data === true;
     } catch (error) {
       console.error("Error en User.delete:", error);
       throw new Error("Error al eliminar usuario");
@@ -232,7 +224,7 @@ class User {
       const { data, error } = await supabase
         .from("usuarios")
         .select(
-          "id, nombre, email, telefono, fecha_creacion, fecha_actualizacion"
+          "id, nombre, email, telefono, fecha_creacion, fecha_actualizacion",
         )
         .ilike("nombre", `%${nombre}%`)
         .order("nombre");

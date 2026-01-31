@@ -78,7 +78,7 @@ class Vaccination {
           *,
           patients!inner(name, species, ownerId),
           clients!inner(name, phone)
-        `
+        `,
         )
         .gte("nextDue", today.toISOString().split("T")[0])
         .lte("nextDue", futureDate.toISOString().split("T")[0])
@@ -110,7 +110,7 @@ class Vaccination {
           *,
           patients!inner(name, species, ownerId),
           clients!inner(name, phone)
-        `
+        `,
         )
         .lt("nextDue", today)
         .order("nextDue", { ascending: true });
@@ -149,27 +149,20 @@ class Vaccination {
         notes,
       } = vaccinationData;
 
-      const now = new Date().toISOString();
-
-      const { data, error } = await supabase
-        .from("vaccinations")
-        .insert([
-          {
-            patientId,
-            date,
-            vaccine,
-            nextDue,
-            veterinarian,
-            batchNumber,
-            notes: notes || null,
-            created_date: now,
-            updated_date: now,
-          },
-        ])
-        .select()
-        .single();
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("create_vaccination", {
+        p_patientid: patientId,
+        p_vaccine: vaccine,
+        p_date: date,
+        p_nextdue: nextDue,
+        p_batchnumber: batchNumber || null,
+        p_veterinarian: veterinarian || null,
+        p_notes: notes || null,
+      });
 
       if (error) throw error;
+
+      const newVaccination = Array.isArray(data) ? data[0] : data;
 
       // Actualizar lastVisit del paciente si es más reciente
       const { data: patient } = await supabase
@@ -183,12 +176,14 @@ class Vaccination {
           .from("patients")
           .update({
             lastVisit: date,
-            updated_date: now,
+            updated_date: new Date().toISOString(),
           })
           .eq("id", patientId);
       }
 
-      return await this.findById(data.id);
+      return newVaccination?.id
+        ? await this.findById(newVaccination.id)
+        : newVaccination;
     } catch (error) {
       console.error("Error en Vaccination.create:", error);
       throw new Error("Error al crear vacunación");
@@ -207,24 +202,19 @@ class Vaccination {
         notes,
       } = vaccinationData;
 
-      const { data, error } = await supabase
-        .from("vaccinations")
-        .update({
-          patientId,
-          date,
-          vaccine,
-          nextDue,
-          veterinarian,
-          batchNumber,
-          notes,
-          updated_date: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .select()
-        .single();
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("update_vaccination", {
+        p_id: id,
+        p_vaccine: vaccine || null,
+        p_date: date || null,
+        p_nextdue: nextDue || null,
+        p_batchnumber: batchNumber || null,
+        p_veterinarian: veterinarian || null,
+        p_notes: notes || null,
+      });
 
       if (error) throw error;
-      if (!data) return null;
+      if (!data || (Array.isArray(data) && data.length === 0)) return null;
 
       return await this.findById(id);
     } catch (error) {
@@ -235,13 +225,13 @@ class Vaccination {
 
   static async delete(id) {
     try {
-      const { error } = await supabase
-        .from("vaccinations")
-        .delete()
-        .eq("id", id);
+      // Usar función RPC de Supabase
+      const { data, error } = await supabase.rpc("delete_vaccination", {
+        p_id: id,
+      });
 
       if (error) throw error;
-      return true;
+      return data === true;
     } catch (error) {
       console.error("Error en Vaccination.delete:", error);
       throw new Error("Error al eliminar vacunación");
