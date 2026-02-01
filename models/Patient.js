@@ -13,11 +13,8 @@ class Patient {
     this.age = patientData.age;
     this.weight = patientData.weight;
     this.gender = patientData.gender;
-    this.birthDate = patientData.birthDate;
-    this.ownerId = patientData.ownerId;
-    this.lastVisit = patientData.lastVisit;
-    this.nextVisit = patientData.nextVisit;
-    this.microchip = patientData.microchip;
+    this.birthdate = patientData.birthdate;
+    this.cedula = patientData.cedula;
     this.color = patientData.color;
     this.allergies = patientData.allergies;
     this.status = patientData.status;
@@ -30,11 +27,7 @@ class Patient {
       const { data, error } = await supabase
         .from("patients")
         .select(
-          `
-          id, name, species, breed, age, weight, gender, birthDate,
-          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
-          created_date, updated_date
-        `,
+          `id, name, species, breed, age, weight, gender, birthdate, cedula, color, allergies, status, created_date, updated_date`,
         )
         .order("created_date", { ascending: false });
 
@@ -51,11 +44,7 @@ class Patient {
       const { data, error } = await supabase
         .from("patients")
         .select(
-          `
-          id, name, species, breed, age, weight, gender, birthDate,
-          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
-          created_date, updated_date
-        `,
+          `id, name, species, breed, age, weight, gender, birthdate, cedula, color, allergies, status, created_date, updated_date`,
         )
         .eq("id", id)
         .single();
@@ -68,47 +57,21 @@ class Patient {
     }
   }
 
-  static async findByOwnerId(ownerId) {
+  static async findByCedula(cedula) {
     try {
       const { data, error } = await supabase
         .from("patients")
         .select(
-          `
-          id, name, species, breed, age, weight, gender, birthDate,
-          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
-          created_date, updated_date
-        `,
+          `id, name, species, breed, age, weight, gender, birthdate, cedula, color, allergies, status, created_date, updated_date`,
         )
-        .eq("ownerId", ownerId)
+        .eq("cedula", cedula)
         .order("name");
 
       if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error("Error en Patient.findByOwnerId:", error);
-      throw new Error("Error al buscar pacientes por dueño");
-    }
-  }
-
-  static async findByMicrochip(microchip) {
-    try {
-      const { data, error } = await supabase
-        .from("patients")
-        .select(
-          `
-          id, name, species, breed, age, weight, gender, birthDate,
-          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
-          created_date, updated_date
-        `,
-        )
-        .eq("microchip", microchip)
-        .single();
-
-      if (error && error.code !== "PGRST116") throw error;
-      return data;
-    } catch (error) {
-      console.error("Error en Patient.findByMicrochip:", error);
-      throw new Error("Error al buscar paciente por microchip");
+      console.error("Error en Patient.findByCedula:", error);
+      throw new Error("Error al buscar pacientes por cédula");
     }
   }
 
@@ -121,14 +84,16 @@ class Patient {
         age,
         weight,
         gender,
-        birthDate,
-        ownerId,
-        nextVisit,
-        microchip,
+        birthDate, // Puede venir como birthDate desde el frontend
+        birthdate, // O como birthdate
+        cedula,
         color,
         allergies,
         status,
       } = patientData;
+
+      // Usar birthdate si existe, si no usar birthDate
+      const birthdateValue = birthdate || birthDate || null;
 
       // Usar función RPC de Supabase
       const { data, error } = await supabase.rpc("create_patient", {
@@ -136,23 +101,17 @@ class Patient {
         p_species: species,
         p_breed: breed,
         p_gender: gender,
-        p_birthdate: birthDate || null,
+        p_birthdate: birthdateValue,
+        p_age: age || null,
         p_weight: weight || null,
-        p_ownerid: ownerId,
-        p_microchip: microchip || null,
+        p_cedula: cedula,
         p_color: color || null,
         p_allergies: allergies || null,
         p_status: status || "Activo",
       });
 
-      if (error) {
-        if (error.code === "23505" || error.message?.includes("duplicate")) {
-          throw new Error("El microchip ya está registrado");
-        }
-        throw error;
-      }
-
-      return Array.isArray(data) ? data[0] : data;
+      if (error) throw error;
+      return data && data.length > 0 ? data[0] : null;
     } catch (error) {
       console.error("Error en Patient.create:", error);
       throw error;
@@ -168,35 +127,34 @@ class Patient {
         age,
         weight,
         gender,
-        birthDate,
-        ownerId,
-        lastVisit,
-        nextVisit,
-        microchip,
+        birthDate, // Puede venir como birthDate desde el backend
+        birthdate, // O como birthdate
+        cedula,
         color,
         allergies,
         status,
       } = patientData;
 
+      // Usar birthdate si existe, si no usar birthDate
+      const birthdateValue = birthdate || birthDate || null;
+
       // Usar función RPC de Supabase
       const { data, error } = await supabase.rpc("update_patient", {
         p_id: id,
+        p_age: age || null,
+        p_allergies: allergies || null,
+        p_birthdate: birthdateValue,
+        p_breed: breed || null,
+        p_cedula: cedula || null,
+        p_color: color || null,
+        p_gender: gender || null,
         p_name: name || null,
         p_species: species || null,
-        p_breed: breed || null,
-        p_gender: gender || null,
-        p_birthdate: birthDate || null,
-        p_weight: weight || null,
-        p_microchip: microchip || null,
-        p_color: color || null,
-        p_allergies: allergies || null,
         p_status: status || null,
+        p_weight: weight || null,
       });
 
       if (error) {
-        if (error.code === "23505" || error.message?.includes("duplicate")) {
-          throw new Error("El microchip ya está registrado");
-        }
         throw error;
       }
 
@@ -228,8 +186,8 @@ class Patient {
         .from("patients")
         .select(
           `
-          id, name, species, breed, age, weight, gender, birthDate,
-          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
+          id, name, species, breed, age, weight, gender, birthdate,
+          cedula, color, allergies, status,
           created_date, updated_date
         `,
         )
@@ -273,8 +231,8 @@ class Patient {
         .from("patients")
         .select(
           `
-          id, name, species, breed, age, weight, gender, birthDate,
-          ownerId, lastVisit, nextVisit, microchip, color, allergies, status,
+          id, name, species, breed, age, weight, gender, birthdate,
+          cedula, color, allergies, status,
           created_date, updated_date
         `,
           { count: "exact" },

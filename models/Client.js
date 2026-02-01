@@ -8,14 +8,12 @@ const { supabase } = require("../config/database");
 class Client {
   constructor(clientData) {
     // Permitir que id sea alias de cedula
-    this.cedula = clientData.cedula || clientData.id;
-    this.id = clientData.id;
+    this.cedula = clientData.cedula;
     this.name = clientData.name;
     this.email = clientData.email;
     this.phone = clientData.phone;
     this.address = clientData.address;
     this.city = clientData.city;
-    // Acepta registrationdate o registrationDate
     this.registrationDate =
       clientData.registrationdate || clientData.registrationDate;
     this.status = clientData.status;
@@ -29,7 +27,7 @@ class Client {
       const { data, error } = await supabase
         .from("clientes")
         .select(
-          "id, cedula, name, email, phone, address, city, registrationdate, status",
+          "cedula, name, email, phone, address, city, registrationdate, status",
         )
         .order("registrationdate", { ascending: false });
 
@@ -44,19 +42,19 @@ class Client {
   /**
    * Busca un cliente por ID
    */
-  static async findById(id) {
+  static async findById(cedula) {
     try {
       const { data, error } = await supabase
         .from("clientes")
         .select("*")
-        .eq("id", id)
+        .eq("cedula", cedula)
         .single();
 
       if (error && error.code !== "PGRST116") throw error;
       return data;
     } catch (error) {
       console.error("Error en Client.findById:", error);
-      throw new Error("Error al buscar cliente por ID");
+      throw new Error("Error al buscar cliente por cédula");
     }
   }
 
@@ -68,7 +66,7 @@ class Client {
       const { data, error } = await supabase
         .from("clientes")
         .select(
-          "id, name, email, phone, address, city, registrationdate, status",
+          "cedula, name, email, phone, address, city, registrationdate, status",
         )
         .eq("email", email)
         .single();
@@ -88,22 +86,15 @@ class Client {
     try {
       const { cedula, name, email, phone, address, city, status } = clientData;
 
-      const { data, error } = await supabase
-        .from("clientes")
-        .insert([
-          {
-            cedula,
-            name,
-            email,
-            phone,
-            address,
-            city,
-            status: status || "Activo",
-            registrationdate: new Date().toISOString(),
-          },
-        ])
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc("create_cliente", {
+        p_cedula: cedula,
+        p_name: name,
+        p_email: email,
+        p_phone: phone || null,
+        p_address: address || null,
+        p_city: city || null,
+        p_status: status || "Activo",
+      });
 
       if (error) {
         if (error.code === "23505") {
@@ -112,7 +103,7 @@ class Client {
         throw error;
       }
 
-      return data;
+      return Array.isArray(data) ? data[0] : data;
     } catch (error) {
       console.error("Error en Client.create:", error);
       throw error;
@@ -124,21 +115,19 @@ class Client {
    */
   static async update(id, clientData) {
     try {
-      const { name, email, phone, address, city, status } = clientData;
-
-      const { data, error } = await supabase
-        .from("clientes")
-        .update({
-          name,
-          email,
-          phone,
-          address,
-          city,
-          status,
-        })
-        .eq("id", id)
-        .select()
-        .single();
+      const { cedula, name, email, phone, address, city, status } = clientData;
+      // Usar cedula como identificador principal
+      const cedulaFinal = cedula || id;
+      const { data, error } = await supabase.rpc("update_cliente", {
+        p_id: cedulaFinal,
+        p_cedula: cedulaFinal,
+        p_name: name || null,
+        p_email: email || null,
+        p_phone: phone || null,
+        p_address: address || null,
+        p_city: city || null,
+        p_status: status || null,
+      });
 
       if (error) {
         if (error.code === "23505") {
@@ -147,7 +136,7 @@ class Client {
         throw error;
       }
 
-      return data;
+      return Array.isArray(data) ? data[0] : data;
     } catch (error) {
       console.error("Error en Client.update:", error);
       throw error;
@@ -159,7 +148,10 @@ class Client {
    */
   static async delete(id) {
     try {
-      const { error } = await supabase.from("clientes").delete().eq("id", id);
+      const { error } = await supabase
+        .from("clientes")
+        .delete()
+        .eq("cedula", id);
 
       if (error) throw error;
       return true;
@@ -230,7 +222,7 @@ class Client {
       } = await supabase
         .from("clientes")
         .select(
-          "id, name, email, phone, address, city, registrationdate, status",
+          "cedula, name, email, phone, address, city, registrationdate, status",
           { count: "exact" },
         )
         .order("registrationdate", { ascending: false })

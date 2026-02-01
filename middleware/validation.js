@@ -81,7 +81,7 @@ const validateRegister = [
     .withMessage("La contraseña debe tener entre 8 y 128 caracteres")
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
     .withMessage(
-      "La contraseña debe contener al menos: 1 minúscula, 1 mayúscula, 1 número y 1 carácter especial"
+      "La contraseña debe contener al menos: 1 minúscula, 1 mayúscula, 1 número y 1 carácter especial",
     ),
 ];
 
@@ -140,7 +140,7 @@ const validateProfileUpdate = [
     .withMessage("La nueva contraseña debe tener entre 8 y 128 caracteres")
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
     .withMessage(
-      "La nueva contraseña debe contener al menos: 1 minúscula, 1 mayúscula, 1 número y 1 carácter especial"
+      "La nueva contraseña debe contener al menos: 1 minúscula, 1 mayúscula, 1 número y 1 carácter especial",
     ),
 ];
 
@@ -556,11 +556,13 @@ const validatePatient = [
       return true;
     }),
 
-  body("ownerId")
+  body("cedula")
     .notEmpty()
-    .withMessage("El ID del dueño es requerido")
-    .isInt({ min: 1 })
-    .withMessage("El ID del dueño debe ser un número entero positivo"),
+    .withMessage("La cédula del dueño es requerida")
+    .isString()
+    .withMessage("La cédula debe ser un texto")
+    .matches(/^\d{6,12}$/)
+    .withMessage("La cédula debe ser un número válido de 6 a 12 dígitos"),
 
   body("lastVisit")
     .optional()
@@ -578,21 +580,11 @@ const validatePatient = [
         new Date(value) < new Date(req.body.lastVisit)
       ) {
         throw new Error(
-          "La próxima visita no puede ser anterior a la última visita"
+          "La próxima visita no puede ser anterior a la última visita",
         );
       }
       return true;
     }),
-
-  body("microchip")
-    .optional()
-    .trim()
-    .isLength({ min: 10, max: 20 })
-    .withMessage("El microchip debe tener entre 10 y 20 caracteres")
-    .matches(/^[A-Z0-9]+$/)
-    .withMessage(
-      "El microchip solo puede contener letras mayúsculas y números"
-    ),
 
   body("color")
     .optional()
@@ -664,10 +656,12 @@ const validatePatientPartial = [
       return true;
     }),
 
-  body("ownerId")
+  body("cedula")
     .optional()
-    .isInt({ min: 1 })
-    .withMessage("El ID del dueño debe ser un número entero positivo"),
+    .isString()
+    .withMessage("La cédula debe ser un texto")
+    .matches(/^\d{6,12}$/)
+    .withMessage("La cédula debe ser un número válido de 6 a 12 dígitos"),
 
   body("lastVisit")
     .optional()
@@ -685,21 +679,11 @@ const validatePatientPartial = [
         new Date(value) < new Date(req.body.lastVisit)
       ) {
         throw new Error(
-          "La próxima visita no puede ser anterior a la última visita"
+          "La próxima visita no puede ser anterior a la última visita",
         );
       }
       return true;
     }),
-
-  body("microchip")
-    .optional()
-    .trim()
-    .isLength({ min: 10, max: 20 })
-    .withMessage("El microchip debe tener entre 10 y 20 caracteres")
-    .matches(/^[A-Z0-9]+$/)
-    .withMessage(
-      "El microchip solo puede contener letras mayúsculas y números"
-    ),
 
   body("color")
     .optional()
@@ -770,7 +754,7 @@ const validatePatientSearch = [
  * Validaciones para los datos completos de visita
  */
 const validateVisit = [
-  body("patientId")
+  body(["patientid", "patientid"])
     .notEmpty()
     .withMessage("El ID del paciente es requerido")
     .isInt({ min: 1 })
@@ -788,7 +772,7 @@ const validateVisit = [
     .withMessage("El tipo de visita es requerido")
     .isIn(["Consulta", "Vacunación", "Cirugía", "Control", "Emergencia"])
     .withMessage(
-      "El tipo debe ser: Consulta, Vacunación, Cirugía, Control o Emergencia"
+      "El tipo debe ser: Consulta, Vacunación, Cirugía, Control o Emergencia",
     ),
 
   body("veterinarian")
@@ -848,42 +832,12 @@ const validateVaccination = [
     .isInt({ min: 1 })
     .withMessage("El ID del paciente debe ser un número entero positivo"),
 
-  body("date")
-    .notEmpty()
-    .withMessage("La fecha es requerida")
-    .isISO8601()
-    .withMessage("La fecha debe ser válida")
-    .custom((value) => {
-      if (value && new Date(value) > new Date()) {
-        throw new Error("La fecha de vacunación no puede ser futura");
-      }
-      return true;
-    }),
-
   body("vaccine")
     .trim()
     .notEmpty()
     .withMessage("El nombre de la vacuna es requerido")
     .isLength({ min: 2, max: 100 })
     .withMessage("El nombre de la vacuna debe tener entre 2 y 100 caracteres"),
-
-  body("nextDue")
-    .notEmpty()
-    .withMessage("La fecha de próxima vacunación es requerida")
-    .isISO8601()
-    .withMessage("La fecha de próxima vacunación debe ser válida")
-    .custom((value, { req }) => {
-      if (
-        value &&
-        req.body.date &&
-        new Date(value) <= new Date(req.body.date)
-      ) {
-        throw new Error(
-          "La fecha de próxima vacunación debe ser posterior a la fecha de aplicación"
-        );
-      }
-      return true;
-    }),
 
   body("veterinarian")
     .trim()
@@ -892,12 +846,6 @@ const validateVaccination = [
     .isLength({ min: 2, max: 150 })
     .withMessage("El veterinario debe tener entre 2 y 150 caracteres"),
 
-  body("batchNumber")
-    .trim()
-    .notEmpty()
-    .withMessage("El número de lote es requerido")
-    .isLength({ min: 3, max: 50 })
-    .withMessage("El número de lote debe tener entre 3 y 50 caracteres"),
   body("notes")
     .optional()
     .trim()

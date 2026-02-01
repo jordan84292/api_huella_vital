@@ -1,6 +1,6 @@
 const Patient = require("../models/Patient");
 const { validationResult } = require("express-validator");
-const { pool } = require("../config/database");
+const { supabase } = require("../config/database");
 
 class PatientController {
   /**
@@ -137,20 +137,20 @@ class PatientController {
         age,
         weight,
         gender,
-        birthDate,
-        ownerId,
-        nextVisit,
-        microchip,
+        birthdate,
+        cedula,
+        nextvisit,
         color,
         allergies,
         status,
       } = req.body;
 
       // Verificar que el propietario existe (Supabase)
+      // Buscar cliente por cédula
       const { data: ownerExists, error: ownerError } = await supabase
         .from("clientes")
-        .select("id")
-        .eq("id", ownerId);
+        .select("cedula")
+        .eq("cedula", cedula);
 
       if (ownerError) {
         return res.status(500).json({
@@ -162,20 +162,9 @@ class PatientController {
       if (!ownerExists || ownerExists.length === 0) {
         return res.status(400).json({
           success: false,
-          message: "El propietario seleccionado no existe",
-          field: "ownerId",
+          message: "El propietario (cédula) seleccionado no existe",
+          field: "cedula",
         });
-      }
-
-      // Verificar si el microchip ya existe (si se proporciona)
-      if (microchip) {
-        const existingPatient = await Patient.findByMicrochip(microchip);
-        if (existingPatient) {
-          return res.status(409).json({
-            success: false,
-            message: "El microchip ya está registrado",
-          });
-        }
       }
 
       const newPatient = await Patient.create({
@@ -185,10 +174,8 @@ class PatientController {
         age,
         weight,
         gender,
-        birthDate,
-        ownerId,
-        nextVisit,
-        microchip,
+        birthdate,
+        cedula,
         color,
         allergies,
         status,
@@ -232,14 +219,38 @@ class PatientController {
         weight,
         gender,
         birthDate,
-        ownerId,
+        cedula,
         lastVisit,
         nextVisit,
-        microchip,
         color,
         allergies,
         status,
       } = req.body;
+
+      // Buscar el ownerId a partir de la cédula
+      let ownerId = null;
+      if (cedula) {
+        const { data: owner, error: ownerError } = await supabase
+          .from("clientes")
+          .select("id")
+          .eq("cedula", cedula)
+          .single();
+        if (ownerError) {
+          return res.status(500).json({
+            success: false,
+            message: "Error al buscar propietario por cédula",
+            error: ownerError.message,
+          });
+        }
+        if (!owner) {
+          return res.status(400).json({
+            success: false,
+            message: "El propietario (cédula) seleccionado no existe",
+            field: "cedula",
+          });
+        }
+        ownerId = owner.id;
+      }
 
       if (isNaN(id)) {
         return res.status(400).json({
@@ -256,37 +267,7 @@ class PatientController {
         });
       }
 
-      // Verificar que el propietario existe (Supabase)
-      const { data: ownerExists, error: ownerError } = await supabase
-        .from("clientes")
-        .select("id")
-        .eq("id", ownerId);
-
-      if (ownerError) {
-        return res.status(500).json({
-          success: false,
-          message: "Error al verificar propietario",
-          error: ownerError.message,
-        });
-      }
-      if (!ownerExists || ownerExists.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "El propietario seleccionado no existe",
-          field: "ownerId",
-        });
-      }
-
-      // Verificar si el microchip ya existe en otro paciente
-      if (microchip && microchip !== existingPatient.microchip) {
-        const microchipPatient = await Patient.findByMicrochip(microchip);
-        if (microchipPatient && microchipPatient.id !== parseInt(id)) {
-          return res.status(409).json({
-            success: false,
-            message: "El microchip ya está registrado en otro paciente",
-          });
-        }
-      }
+      // ownerId ya está validado arriba
 
       const updatedPatient = await Patient.update(id, {
         name,
@@ -299,7 +280,6 @@ class PatientController {
         ownerId,
         lastVisit,
         nextVisit,
-        microchip,
         color,
         allergies,
         status,

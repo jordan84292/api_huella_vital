@@ -55,7 +55,7 @@ class Visit {
       const { data, error } = await supabase
         .from("visits")
         .select("*")
-        .eq("patientId", patientId)
+        .eq("patientid", patientId)
         .order("date", { ascending: false });
 
       if (error) throw error;
@@ -70,37 +70,31 @@ class Visit {
     try {
       const {
         patientId,
+        patientid,
         date,
-        reason,
+        type,
         veterinarian,
         diagnosis,
         treatment,
         notes,
+        cost,
       } = visitData;
 
       // Usar función RPC de Supabase
       const { data, error } = await supabase.rpc("create_visit", {
-        p_patientid: patientId,
+        p_cost: cost,
         p_date: date,
-        p_reason: reason,
         p_diagnosis: diagnosis,
-        p_treatment: treatment,
-        p_veterinarian: veterinarian || null,
         p_notes: notes || null,
+        p_patientid: patientid || patientId, // Acepta ambos formatos
+        p_treatment: treatment,
+        p_type: type,
+        p_veterinarian: veterinarian || null,
       });
 
       if (error) throw error;
 
       const newVisit = Array.isArray(data) ? data[0] : data;
-
-      // Actualizar lastVisit del paciente
-      await supabase
-        .from("patients")
-        .update({
-          lastVisit: date,
-          updated_date: new Date().toISOString(),
-        })
-        .eq("id", patientId);
 
       return newVisit?.id ? await this.findById(newVisit.id) : newVisit;
     } catch (error) {

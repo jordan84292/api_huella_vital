@@ -23,7 +23,7 @@ class Vaccination {
       const { data, error } = await supabase
         .from("vaccinations")
         .select("*")
-        .order("date", { ascending: false });
+        .order("created_date", { ascending: false });
 
       if (error) throw error;
       return data || [];
@@ -54,8 +54,8 @@ class Vaccination {
       const { data, error } = await supabase
         .from("vaccinations")
         .select("*")
-        .eq("patientId", patientId)
-        .order("date", { ascending: false });
+        .eq("patientid", patientId)
+        .order("created_date", { ascending: false });
 
       if (error) throw error;
       return data || [];
@@ -99,63 +99,14 @@ class Vaccination {
     }
   }
 
-  static async getOverdue() {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-
-      const { data, error } = await supabase
-        .from("vaccinations")
-        .select(
-          `
-          *,
-          patients!inner(name, species, ownerId),
-          clients!inner(name, phone)
-        `,
-        )
-        .lt("nextDue", today)
-        .order("nextDue", { ascending: true });
-
-      if (error) throw error;
-
-      return (data || []).map((vaccination) => {
-        const nextDue = new Date(vaccination.nextDue);
-        const now = new Date();
-        const daysOverdue = Math.floor((now - nextDue) / (1000 * 60 * 60 * 24));
-
-        return {
-          ...vaccination,
-          patientName: vaccination.patients.name,
-          species: vaccination.patients.species,
-          ownerName: vaccination.clients.name,
-          ownerPhone: vaccination.clients.phone,
-          daysOverdue,
-        };
-      });
-    } catch (error) {
-      console.error("Error en Vaccination.getOverdue:", error);
-      throw new Error("Error al obtener vacunaciones vencidas");
-    }
-  }
-
   static async create(vaccinationData) {
     try {
-      const {
-        patientId,
-        date,
-        vaccine,
-        nextDue,
-        veterinarian,
-        batchNumber,
-        notes,
-      } = vaccinationData;
+      const { patientId, vaccine, veterinarian, notes } = vaccinationData;
 
-      // Usar función RPC de Supabase
+      // Usar función RPC de Supabase solo con los campos actuales
       const { data, error } = await supabase.rpc("create_vaccination", {
         p_patientid: patientId,
         p_vaccine: vaccine,
-        p_date: date,
-        p_nextdue: nextDue,
-        p_batchnumber: batchNumber || null,
         p_veterinarian: veterinarian || null,
         p_notes: notes || null,
       });
@@ -163,23 +114,6 @@ class Vaccination {
       if (error) throw error;
 
       const newVaccination = Array.isArray(data) ? data[0] : data;
-
-      // Actualizar lastVisit del paciente si es más reciente
-      const { data: patient } = await supabase
-        .from("patients")
-        .select("lastVisit")
-        .eq("id", patientId)
-        .single();
-
-      if (!patient?.lastVisit || new Date(date) > new Date(patient.lastVisit)) {
-        await supabase
-          .from("patients")
-          .update({
-            lastVisit: date,
-            updated_date: new Date().toISOString(),
-          })
-          .eq("id", patientId);
-      }
 
       return newVaccination?.id
         ? await this.findById(newVaccination.id)

@@ -81,10 +81,28 @@ class VisitController {
 
       const newVisit = await Visit.create(req.body);
 
+      // Obtener la última visita (más reciente) del paciente
+      const visits = await Visit.findByPatientId(req.body.patientId);
+      const lastVisit = visits && visits.length > 0 ? visits[0] : null;
+
+      // Obtener la siguiente cita (más próxima en el futuro) del paciente
+      const Appointment = require("../models/Appointment");
+      const allAppointments = await Appointment.findByPatientId(
+        req.body.patientId,
+      );
+      const now = new Date();
+      const nextAppointment = allAppointments
+        ? allAppointments
+            .filter((a) => new Date(a.date) > now)
+            .sort((a, b) => new Date(a.date) - new Date(b.date))[0] || null
+        : null;
+
       res.status(201).json({
         success: true,
         message: "Visita creada correctamente",
         data: newVisit,
+        lastVisit,
+        nextAppointment,
       });
     } catch (error) {
       console.error("Error en createVisit:", error);

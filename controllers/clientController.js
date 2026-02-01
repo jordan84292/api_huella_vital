@@ -177,18 +177,19 @@ class ClientController {
       }
 
       const { id } = req.params;
-      const { name, email, phone, address, city, status } = req.body;
+      const { cedula, name, email, phone, address, city, status } = req.body;
 
-      // Validar que el ID sea un número
-      if (isNaN(id)) {
+      // Validar que la cédula sea válida
+      const cedulaFinal = cedula || id;
+      if (!cedulaFinal || isNaN(cedulaFinal)) {
         return res.status(400).json({
           success: false,
-          message: "El ID debe ser un número válido",
+          message: "La cédula debe ser un número válido",
         });
       }
 
       // Verificar si el cliente existe
-      const existingClient = await Client.findById(id);
+      const existingClient = await Client.findById(cedulaFinal);
       if (!existingClient) {
         return res.status(404).json({
           success: false,
@@ -199,7 +200,7 @@ class ClientController {
       // Verificar si el email ya existe en otro cliente
       if (email !== existingClient.email) {
         const emailClient = await Client.findByEmail(email);
-        if (emailClient && emailClient.id !== parseInt(id)) {
+        if (emailClient && emailClient.cedula !== cedulaFinal) {
           return res.status(409).json({
             success: false,
             message: "El email ya está registrado en otro cliente",
@@ -208,7 +209,8 @@ class ClientController {
       }
 
       // Actualizar el cliente
-      const updatedClient = await Client.update(id, {
+      const updatedClient = await Client.update(cedulaFinal, {
+        cedula: cedulaFinal,
         name,
         email,
         phone,

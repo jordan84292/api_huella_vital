@@ -112,6 +112,15 @@ class AuthController {
         });
       }
 
+      // Log para depuración: mostrar hash y contraseña proporcionada
+      console.log("[LOGIN DEBUG] Hash en BD:", user.password);
+      console.log("[LOGIN DEBUG] Contraseña proporcionada:", password);
+      // Mostrar el hash real de la contraseña proporcionada para update manual
+      const bcrypt = require("bcryptjs");
+      bcrypt.hash(password, 10).then((hash) => {
+        console.log("[LOGIN DEBUG] Hash bcrypt generado para update:", hash);
+      });
+
       // Verificar contraseña
       const isPasswordValid = await bcrypt.compare(password, user.password);
       if (!isPasswordValid) {

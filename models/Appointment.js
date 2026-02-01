@@ -33,29 +33,35 @@ class Appointment {
 
   static async findById(id) {
     try {
+      // Obtener la cita y el paciente relacionado
       const { data, error } = await supabase
         .from("appointments")
-        .select(
-          `
-          *,
-          patients!inner(name, species),
-          clientes!inner(name)
-        `,
-        )
+        .select(`*, patients!inner(name, species, cedula)`) // cedula es la referencia al cliente
         .eq("id", id)
         .single();
 
       if (error && error.code !== "PGRST116") throw error;
+      if (!data) return null;
 
-      if (data) {
-        return {
-          ...data,
-          patientName: data.patients.name,
-          species: data.patients.species,
-          ownerName: data.clientes.name,
-        };
+      // Buscar el propietario (cliente) usando ownerId
+      let ownerName = null;
+      if (data.patients && data.patients.cedula) {
+        const { data: clientData, error: clientError } = await supabase
+          .from("clientes")
+          .select("name")
+          .eq("cedula", data.patients.cedula)
+          .single();
+        if (!clientError && clientData) {
+          ownerName = clientData.name;
+        }
       }
-      return null;
+
+      return {
+        ...data,
+        patientName: data.patients?.name || "",
+        species: data.patients?.species || "",
+        ownerName: ownerName || "",
+      };
     } catch (error) {
       console.error("Error en Appointment.findById:", error);
       throw new Error("Error al buscar cita por ID");
@@ -66,25 +72,36 @@ class Appointment {
     try {
       const { data, error } = await supabase
         .from("appointments")
-        .select(
-          `
-          *,
-          patients!inner(name, species),
-          clientes!inner(name)
-        `,
-        )
+        .select(`*, patients!inner(name, species, cedula)`)
         .eq("patientId", patientId)
         .order("date", { ascending: false })
         .order("time", { ascending: false });
 
       if (error) throw error;
 
-      return (data || []).map((appointment) => ({
-        ...appointment,
-        patientName: appointment.patients.name,
-        species: appointment.patients.species,
-        ownerName: appointment.clientes.name,
-      }));
+      // Para cada cita, buscar el propietario (cliente) usando ownerId
+      const citasConPropietario = await Promise.all(
+        (data || []).map(async (appointment) => {
+          let ownerName = null;
+          if (appointment.patients && appointment.patients.cedula) {
+            const { data: clientData, error: clientError } = await supabase
+              .from("clientes")
+              .select("name")
+              .eq("cedula", appointment.patients.cedula)
+              .single();
+            if (!clientError && clientData) {
+              ownerName = clientData.name;
+            }
+          }
+          return {
+            ...appointment,
+            patientName: appointment.patients?.name || "",
+            species: appointment.patients?.species || "",
+            ownerName: ownerName || "",
+          };
+        }),
+      );
+      return citasConPropietario;
     } catch (error) {
       console.error("Error en Appointment.findByPatientId:", error);
       throw new Error("Error al buscar citas por paciente");
@@ -94,7 +111,7 @@ class Appointment {
   static async findByDate(date) {
     try {
       const { data, error } = await supabase
-        .from("vistacitapacientecliente")
+        .from("appointments")
         .select("*")
         .eq("date", date);
 
@@ -110,25 +127,36 @@ class Appointment {
     try {
       const { data, error } = await supabase
         .from("appointments")
-        .select(
-          `
-          *,
-          patients!inner(name, species),
-          clientes!inner(name)
-        `,
-        )
+        .select(`*, patients!inner(name, species, cedula)`)
         .eq("status", status)
         .order("date", { ascending: false })
         .order("time", { ascending: false });
 
       if (error) throw error;
 
-      return (data || []).map((appointment) => ({
-        ...appointment,
-        patientName: appointment.patients.name,
-        species: appointment.patients.species,
-        ownerName: appointment.clientes.name,
-      }));
+      // Para cada cita, buscar el propietario (cliente) usando ownerId
+      const citasConPropietario = await Promise.all(
+        (data || []).map(async (appointment) => {
+          let ownerName = null;
+          if (appointment.patients && appointment.patients.cedula) {
+            const { data: clientData, error: clientError } = await supabase
+              .from("clientes")
+              .select("name")
+              .eq("cedula", appointment.patients.cedula)
+              .single();
+            if (!clientError && clientData) {
+              ownerName = clientData.name;
+            }
+          }
+          return {
+            ...appointment,
+            patientName: appointment.patients?.name || "",
+            species: appointment.patients?.species || "",
+            ownerName: ownerName || "",
+          };
+        }),
+      );
+      return citasConPropietario;
     } catch (error) {
       console.error("Error en Appointment.findByStatus:", error);
       throw new Error("Error al buscar citas por estado");
@@ -139,6 +167,17 @@ class Appointment {
     try {
       const { patientId, date, time, type, veterinarian, status, notes } =
         appointmentData;
+
+      // Validar que no exista cita en la misma fecha y hora
+      const { data: existing, error: errorExisting } = await supabase
+        .from("appointments")
+        .select("id")
+        .eq("date", date)
+        .eq("time", time);
+      if (errorExisting) throw errorExisting;
+      if (existing && existing.length > 0) {
+        throw new Error("Ya existe una cita en la misma fecha y hora");
+      }
 
       // Usar función RPC de Supabase
       const { data, error } = await supabase.rpc("create_appointment", {
@@ -168,7 +207,14 @@ class Appointment {
         : newAppointment;
     } catch (error) {
       console.error("Error en Appointment.create:", error);
-      throw new Error("Error al crear cita");
+      // Si el error es por cita duplicada, propagar el mensaje exacto
+      if (
+        error.message &&
+        error.message.includes("Ya existe una cita en la misma fecha y hora")
+      ) {
+        throw { status: 400, message: error.message };
+      }
+      throw new Error(error.message || "Error al crear cita");
     }
   }
 

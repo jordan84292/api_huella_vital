@@ -130,6 +130,14 @@ class AppointmentController {
       });
     } catch (error) {
       console.error("Error en createAppointment:", error);
+      // Si el error tiene status 400, devolver ese status y mensaje
+      if (error.status === 400) {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+          error: error.message,
+        });
+      }
       res.status(500).json({
         success: false,
         message: "Error interno del servidor",
