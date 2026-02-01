@@ -562,7 +562,7 @@ const validatePatient = [
     .isString()
     .withMessage("La cédula debe ser un texto")
     .matches(/^\d{6,12}$/)
-    .withMessage("La cédula debe ser un número válido de 6 a 12 dígitos"),
+    .withMessage("La cédula debe ser un número válido 9 dígitos"),
 
   body("lastVisit")
     .optional()
@@ -661,7 +661,7 @@ const validatePatientPartial = [
     .isString()
     .withMessage("La cédula debe ser un texto")
     .matches(/^\d{6,12}$/)
-    .withMessage("La cédula debe ser un número válido de 6 a 12 dígitos"),
+    .withMessage("La cédula debe ser un número válido de 9 dígitos"),
 
   body("lastVisit")
     .optional()
