@@ -65,7 +65,7 @@ class User {
       const { data, error } = await supabase
         .from("usuarios")
         .select(
-          "id, nombre, email, telefono, fecha_creacion, fecha_actualizacion",
+          "id, nombre, email, telefono, rol, status, fecha_creacion, fecha_actualizacion",
         )
         .eq("email", email)
         .single();
@@ -96,6 +96,7 @@ class User {
         Veterinario: "2",
         Recepcionista: "3",
         Asistente: "4",
+        Cliente: "5", // Rol para clientes móviles
       };
       const rol = roleMap[rolName] || "4";
 
@@ -145,6 +146,7 @@ class User {
         Veterinario: "2",
         Recepcionista: "3",
         Asistente: "4",
+        Cliente: "5", // Rol para clientes móviles
       };
       const rol = rolName ? roleMap[rolName] : null;
 

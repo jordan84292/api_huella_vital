@@ -4,6 +4,7 @@
  */
 
 const Client = require("../models/Client");
+const User = require("../models/User");
 const { validationResult } = require("express-validator");
 
 /**
@@ -132,6 +133,15 @@ class ClientController {
         });
       }
 
+      // Verificar si ya existe un usuario con este email
+      const existingUser = await User.findByEmail(email);
+      if (existingUser) {
+        return res.status(409).json({
+          success: false,
+          message: "Ya existe un usuario con este email",
+        });
+      }
+
       // Crear el cliente
       const newClient = await Client.create({
         cedula: cedulaFinal,
@@ -143,9 +153,31 @@ class ClientController {
         status: status || "Activo",
       });
 
+      // Crear automáticamente un usuario de tipo "Cliente" para la app móvil
+      try {
+        const newUser = await User.create({
+          nombre: name,
+          email: email,
+          telefono: phone,
+          rolName: "Cliente", // Rol específico para clientes
+          status: "Activo",
+          // Password por defecto (se puede cambiar después)
+          password:
+            "$2a$12$EvXWYFrmIDImmqpUckeb6.VwCSIi8JX4guQevhu9lJzfElf6AdRvu", // password: 123456
+        });
+
+        console.log(
+          `Usuario creado automáticamente para cliente ${name} con email ${email}`,
+        );
+      } catch (userError) {
+        console.error("Error al crear usuario automáticamente:", userError);
+        // No devolver error ya que el cliente se creó correctamente
+        // Solo loguear el error para debugging
+      }
+
       res.status(201).json({
         success: true,
-        message: "Cliente creado correctamente",
+        message: "Cliente creado correctamente y usuario de acceso generado",
         data: newClient,
       });
     } catch (error) {
@@ -261,15 +293,68 @@ class ClientController {
         });
       }
 
+      console.log(
+        `Eliminando cliente: ${existingClient.name} (${existingClient.email})`,
+      );
+
+      // Buscar y eliminar el usuario asociado por email y rol Cliente (5)
+      let userDeleted = false;
+      try {
+        console.log(
+          `Buscando usuario asociado con email: ${existingClient.email}`,
+        );
+        const associatedUser = await User.findByEmail(existingClient.email);
+
+        if (associatedUser) {
+          console.log(`Usuario encontrado:`, {
+            id: associatedUser.id,
+            nombre: associatedUser.nombre,
+            email: associatedUser.email,
+            rol: associatedUser.rol,
+          });
+
+          if (associatedUser.rol === "5") {
+            console.log(
+              `Eliminando usuario con rol Cliente (5): ${associatedUser.id}`,
+            );
+            const deleteResult = await User.delete(associatedUser.id);
+            console.log(`Resultado eliminación usuario:`, deleteResult);
+            userDeleted = true;
+            console.log(
+              `Usuario asociado eliminado exitosamente: ${existingClient.email}`,
+            );
+          } else {
+            console.log(
+              `Usuario encontrado pero no es Cliente (rol: ${associatedUser.rol}), no se elimina`,
+            );
+          }
+        } else {
+          console.log(
+            `No se encontró usuario asociado con email: ${existingClient.email}`,
+          );
+        }
+      } catch (userError) {
+        console.error("Error al eliminar usuario asociado:", userError);
+        console.error("Stack trace:", userError.stack);
+        // Continuamos con la eliminación del cliente aunque falle la eliminación del usuario
+      }
+
       // Eliminar el cliente
+      console.log(`Eliminando cliente con ID: ${id}`);
       await Client.delete(id);
+      console.log(`Cliente eliminado exitosamente`);
+
+      const message = userDeleted
+        ? "Cliente y usuario asociado eliminados correctamente"
+        : "Cliente eliminado correctamente (no se encontró usuario asociado o no era de tipo Cliente)";
 
       res.status(200).json({
         success: true,
-        message: "Cliente eliminado correctamente",
+        message: message,
       });
     } catch (error) {
       console.error("Error en deleteClient:", error);
+      console.error("Stack trace:", error.stack);
       res.status(500).json({
         success: false,
         message: "Error interno del servidor",
