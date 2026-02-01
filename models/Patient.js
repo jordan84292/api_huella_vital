@@ -77,22 +77,42 @@ class Patient {
 
   static async findByOwnerId(ownerId) {
     try {
-      // Buscar pacientes donde el ownerId coincida con el user ID
-      // Como en este sistema los pacientes pueden estar asociados por cedula o user ID
-      // Vamos a buscar por cedula usando el ID del usuario como cedula
+      // Primero buscar el usuario por ID para obtener su email
+      const { data: userData, error: userError } = await supabase
+        .from("usuarios")
+        .select("email")
+        .eq("id", ownerId)
+        .single();
+
+      if (userError) throw userError;
+      if (!userData) return [];
+
+      // Luego buscar el cliente con el mismo email
+      const { data: clientData, error: clientError } = await supabase
+        .from("clientes")
+        .select("cedula")
+        .eq("email", userData.email)
+        .single();
+
+      if (clientError || !clientData) {
+        // Si no existe cliente con ese email, retornar array vacío
+        return [];
+      }
+
+      // Finalmente buscar los pacientes del cliente
       const { data, error } = await supabase
         .from("patients")
         .select(
           `id, name, species, breed, age, weight, gender, birthdate, cedula, color, allergies, status, created_date, updated_date`,
         )
-        .eq("cedula", ownerId)
+        .eq("cedula", clientData.cedula)
         .order("name");
 
       if (error) throw error;
       return data || [];
     } catch (error) {
       console.error("Error en Patient.findByOwnerId:", error);
-      throw new Error("Error al buscar pacientes por owner ID");
+      return []; // Retornar array vacío en caso de error
     }
   }
 
