@@ -28,8 +28,12 @@ class ClientController {
       if (search) {
         // Si hay parámetro de búsqueda, buscar por nombre
         const clients = await Client.searchByName(search);
+        const mappedClients = clients.map((client) => ({
+          ...client,
+          id: client.cedula, // Asegurar que id sea igual a cedula
+        }));
         result = {
-          clients,
+          clients: mappedClients,
           pagination: {
             currentPage: 1,
             totalPages: 1,
@@ -43,10 +47,16 @@ class ClientController {
         result = await Client.paginate(page, limit);
       }
 
+      // Mapear los datos para asegurar que tengan el campo id igual a cedula
+      const mappedClients = result.clients.map((client) => ({
+        ...client,
+        id: client.cedula, // Asegurar que id sea igual a cedula para compatibilidad con frontend
+      }));
+
       res.status(200).json({
         success: true,
         message: "Clientes obtenidos correctamente",
-        data: result.clients,
+        data: mappedClients,
         pagination: result.pagination,
       });
     } catch (error) {
@@ -86,10 +96,16 @@ class ClientController {
         });
       }
 
+      // Mapear cedula a id para compatibilidad con frontend
+      const mappedClient = {
+        ...client,
+        id: client.cedula,
+      };
+
       res.status(200).json({
         success: true,
         message: "Cliente obtenido correctamente",
-        data: client,
+        data: mappedClient,
       });
     } catch (error) {
       console.error("Error en getClientById:", error);
@@ -153,6 +169,12 @@ class ClientController {
         status: status || "Activo",
       });
 
+      // Mapear cedula a id para compatibilidad con frontend
+      const mappedClient = {
+        ...newClient,
+        id: newClient.cedula,
+      };
+
       // Crear automáticamente un usuario de tipo "Cliente" para la app móvil
       try {
         const newUser = await User.create({
@@ -178,7 +200,7 @@ class ClientController {
       res.status(201).json({
         success: true,
         message: "Cliente creado correctamente y usuario de acceso generado",
-        data: newClient,
+        data: mappedClient,
       });
     } catch (error) {
       console.error("Error en createClient:", error);
@@ -251,10 +273,16 @@ class ClientController {
         status,
       });
 
+      // Mapear cedula a id para compatibilidad con frontend
+      const mappedClient = {
+        ...updatedClient,
+        id: updatedClient.cedula,
+      };
+
       res.status(200).json({
         success: true,
         message: "Cliente actualizado correctamente",
-        data: updatedClient,
+        data: mappedClient,
       });
     } catch (error) {
       console.error("Error en updateClient:", error);
@@ -382,11 +410,17 @@ class ClientController {
 
       const clients = await Client.searchByName(q.trim());
 
+      // Mapear cedula a id para compatibilidad con frontend
+      const mappedClients = clients.map((client) => ({
+        ...client,
+        id: client.cedula,
+      }));
+
       res.status(200).json({
         success: true,
         message: "Búsqueda completada",
-        data: clients,
-        count: clients.length,
+        data: mappedClients,
+        count: mappedClients.length,
       });
     } catch (error) {
       console.error("Error en searchClients:", error);
