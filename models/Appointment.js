@@ -32,12 +32,18 @@ class Appointment {
         return [];
       }
 
+      console.log(`Processing ${appointments.length} appointments`);
+
       // Para cada cita, obtener datos del paciente y propietario
       const appointmentsWithDetails = await Promise.all(
         appointments.map(async (appointment) => {
           let patientName = "";
           let species = "";
           let ownerName = "";
+
+          console.log(
+            `Processing appointment ${appointment.id}, patientId: ${appointment.patientId}`,
+          );
 
           // Obtener datos del paciente
           if (appointment.patientId) {
@@ -48,9 +54,19 @@ class Appointment {
                 .eq("id", appointment.patientId)
                 .single();
 
+              if (patientError) {
+                console.error(
+                  `Patient not found for ID ${appointment.patientId}:`,
+                  patientError,
+                );
+              }
+
               if (!patientError && patientData) {
                 patientName = patientData.name;
                 species = patientData.species;
+                console.log(
+                  `Found patient: ${patientName}, cedula: ${patientData.cedula}`,
+                );
 
                 // Obtener datos del propietario usando cedula
                 if (patientData.cedula) {
@@ -61,8 +77,16 @@ class Appointment {
                       .eq("cedula", patientData.cedula)
                       .single();
 
+                  if (clientError) {
+                    console.error(
+                      `Client not found for cedula ${patientData.cedula}:`,
+                      clientError,
+                    );
+                  }
+
                   if (!clientError && clientData) {
                     ownerName = clientData.name;
+                    console.log(`Found owner: ${ownerName}`);
                   }
                 }
               }
@@ -72,6 +96,8 @@ class Appointment {
                 error,
               );
             }
+          } else {
+            console.warn(`Appointment ${appointment.id} has no patientId`);
           }
 
           return {
@@ -83,6 +109,9 @@ class Appointment {
         }),
       );
 
+      console.log(
+        `Returning ${appointmentsWithDetails.length} appointments with details`,
+      );
       return appointmentsWithDetails;
     } catch (error) {
       console.error("Error en findAll:", error);
