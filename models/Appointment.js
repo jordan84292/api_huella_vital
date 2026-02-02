@@ -291,6 +291,8 @@ class Appointment {
 
       console.log("Creating appointment with data:", appointmentData);
       console.log("patientId:", patientId);
+      console.log("date received:", date);
+      console.log("date type:", typeof date);
 
       // Validar que no exista cita en la misma fecha y hora
       const { data: existing, error: errorExisting } = await supabase
