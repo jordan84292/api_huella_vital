@@ -70,33 +70,63 @@ class Appointment {
 
   static async findByPatientId(patientId) {
     try {
+      // Validar que patientId existe
+      if (!patientId) {
+        console.log("patientId no proporcionado");
+        return [];
+      }
+
+      // Primero verificar si el paciente existe
+      const { data: patientExists, error: patientError } = await supabase
+        .from("patients")
+        .select("id, name, species, cedula")
+        .eq("id", patientId)
+        .single();
+
+      if (patientError || !patientExists) {
+        console.log(`Paciente ${patientId} no encontrado`);
+        return [];
+      }
+
+      // Obtener las citas del paciente
       const { data, error } = await supabase
         .from("appointments")
-        .select(`*, patients!inner(name, species, cedula)`)
+        .select("*")
         .eq("patientId", patientId)
         .order("date", { ascending: false })
         .order("time", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error al obtener citas:", error);
+        return [];
+      }
 
-      // Para cada cita, buscar el propietario (cliente) usando ownerId
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      // Para cada cita, buscar el propietario (cliente) usando cedula
       const citasConPropietario = await Promise.all(
-        (data || []).map(async (appointment) => {
+        data.map(async (appointment) => {
           let ownerName = null;
-          if (appointment.patients && appointment.patients.cedula) {
-            const { data: clientData, error: clientError } = await supabase
-              .from("clientes")
-              .select("name")
-              .eq("cedula", appointment.patients.cedula)
-              .single();
-            if (!clientError && clientData) {
-              ownerName = clientData.name;
+          if (patientExists.cedula) {
+            try {
+              const { data: clientData, error: clientError } = await supabase
+                .from("clientes")
+                .select("name")
+                .eq("cedula", patientExists.cedula)
+                .single();
+              if (!clientError && clientData) {
+                ownerName = clientData.name;
+              }
+            } catch (error) {
+              console.error("Error al obtener cliente:", error);
             }
           }
           return {
             ...appointment,
-            patientName: appointment.patients?.name || "",
-            species: appointment.patients?.species || "",
+            patientName: patientExists.name || "",
+            species: patientExists.species || "",
             ownerName: ownerName || "",
           };
         }),
@@ -104,7 +134,8 @@ class Appointment {
       return citasConPropietario;
     } catch (error) {
       console.error("Error en Appointment.findByPatientId:", error);
-      throw new Error("Error al buscar citas por paciente");
+      // Retornar array vacío en lugar de lanzar error
+      return [];
     }
   }
 
