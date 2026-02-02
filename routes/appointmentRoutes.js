@@ -19,7 +19,7 @@ router.get("/stats", AppointmentController.getAppointmentStats);
  */
 router.get(
   "/patient/:patientId",
-  AppointmentController.getAppointmentsByPatient
+  AppointmentController.getAppointmentsByPatient,
 );
 
 /**
@@ -48,7 +48,7 @@ router.get(
   "/:id",
   validateAppointmentId,
   handleValidationErrors,
-  AppointmentController.getAppointmentById
+  AppointmentController.getAppointmentById,
 );
 
 /**
@@ -59,7 +59,7 @@ router.post(
   "/",
   validateAppointment,
   handleValidationErrors,
-  AppointmentController.createAppointment
+  AppointmentController.createAppointment,
 );
 
 /**
@@ -71,7 +71,18 @@ router.put(
   validateAppointmentId,
   validateAppointment,
   handleValidationErrors,
-  AppointmentController.updateAppointment
+  AppointmentController.updateAppointment,
+);
+
+/**
+ * @route POST /appointments/:id/attend
+ * @description Atender una cita (cambia estado a Completada y crea una visita)
+ */
+router.post(
+  "/:id/attend",
+  validateAppointmentId,
+  handleValidationErrors,
+  AppointmentController.attendAppointment,
 );
 
 /**
@@ -82,7 +93,7 @@ router.delete(
   "/:id",
   validateAppointmentId,
   handleValidationErrors,
-  AppointmentController.deleteAppointment
+  AppointmentController.deleteAppointment,
 );
 
 module.exports = router;

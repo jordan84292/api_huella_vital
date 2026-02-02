@@ -83,7 +83,15 @@ class User {
    */
   static async create(userData) {
     try {
-      let { nombre, email, rolName, status, telefono, password } = userData;
+      let {
+        nombre,
+        email,
+        rol: rolDirect,
+        rolName,
+        status,
+        telefono,
+        password,
+      } = userData;
 
       if (!password) {
         password =
@@ -98,7 +106,9 @@ class User {
         Asistente: "4",
         Cliente: "5", // Rol para clientes móviles
       };
-      const rol = roleMap[rolName] || "4";
+
+      // Si viene rol directo (código numérico), usarlo; si no, mapear desde rolName
+      const rol = rolDirect || (rolName ? roleMap[rolName] : "4");
 
       // Usar función RPC de Supabase
       const { data, error } = await supabase.rpc("create_usuario", {
@@ -139,7 +149,15 @@ class User {
    */
   static async update(id, userData) {
     try {
-      const { nombre, email, telefono, password, rolName, status } = userData;
+      const {
+        nombre,
+        email,
+        telefono,
+        password,
+        rol: rolDirect,
+        rolName,
+        status,
+      } = userData;
 
       const roleMap = {
         Administrador: "1",
@@ -148,7 +166,8 @@ class User {
         Asistente: "4",
         Cliente: "5", // Rol para clientes móviles
       };
-      const rol = rolName ? roleMap[rolName] : null;
+      // Si viene rol directo (código numérico), usarlo; si no, mapear desde rolName
+      const rol = rolDirect || (rolName ? roleMap[rolName] : null);
 
       // Usar función RPC de Supabase
       const { data, error } = await supabase.rpc("update_usuario", {

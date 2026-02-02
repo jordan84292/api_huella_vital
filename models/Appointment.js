@@ -471,6 +471,69 @@ class Appointment {
       throw new Error("Error al contar citas por fecha");
     }
   }
+
+  static async attendAppointment(appointmentId, visitData) {
+    try {
+      // 1. Verificar que la cita existe y está en estado "Programada"
+      const { data: appointment, error: aptError } = await supabase
+        .from("appointments")
+        .select("*")
+        .eq("id", appointmentId)
+        .single();
+
+      if (aptError || !appointment) {
+        throw new Error("Cita no encontrada");
+      }
+
+      if (appointment.status !== "Programada") {
+        throw new Error("Solo se pueden atender citas en estado Programada");
+      }
+
+      // 2. Crear la visita usando la función RPC
+      const { data: visitCreated, error: visitError } = await supabase.rpc(
+        "create_visit",
+        {
+          p_patientid: appointment.patientid,
+          p_date: visitData.date || appointment.date,
+          p_type: visitData.type || appointment.type,
+          p_veterinarian: visitData.veterinarian || appointment.veterinarian,
+          p_diagnosis: visitData.diagnosis,
+          p_treatment: visitData.treatment,
+          p_notes: visitData.notes || null,
+          p_cost: visitData.cost || 0,
+        },
+      );
+
+      if (visitError) {
+        console.error("Error creating visit:", visitError);
+        throw new Error("Error al crear la visita: " + visitError.message);
+      }
+
+      // 3. Actualizar el estado de la cita a "Completada"
+      const { data: updatedAppointment, error: updateError } = await supabase
+        .from("appointments")
+        .update({
+          status: "Completada",
+          updated_date: new Date().toISOString(),
+        })
+        .eq("id", appointmentId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error("Error updating appointment:", updateError);
+        throw new Error("Error al actualizar la cita: " + updateError.message);
+      }
+
+      return {
+        appointment: updatedAppointment,
+        visit: visitCreated,
+      };
+    } catch (error) {
+      console.error("Error en Appointment.attendAppointment:", error);
+      throw error;
+    }
+  }
 }
 
 module.exports = Appointment;

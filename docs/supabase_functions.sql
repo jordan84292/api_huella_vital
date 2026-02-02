@@ -74,9 +74,10 @@ END;
 $$;
 
 -- Crear cita (appointment)
+-- IMPORTANTE: p_date debe ser VARCHAR en formato 'YYYY-MM-DD' para evitar conversión de zona horaria
 CREATE OR REPLACE FUNCTION create_appointment(
   p_patientid BIGINT,
-  p_date DATE,
+  p_date VARCHAR, -- Cambiado de DATE a VARCHAR
   p_time TIME,
   p_type appointment_type,
   p_veterinarian VARCHAR,
@@ -100,7 +101,7 @@ AS $$
 BEGIN
   RETURN QUERY
   INSERT INTO appointments (patientId, date, time, type, veterinarian, status, notes, created_date, updated_date)
-  VALUES (p_patientid, p_date, p_time, p_type, p_veterinarian, p_status, p_notes, NOW(), NOW())
+  VALUES (p_patientid, p_date::DATE, p_time, p_type, p_veterinarian, p_status, p_notes, NOW(), NOW())
   RETURNING appointments.id, appointments.patientId, appointments.date, appointments.time, appointments.type, appointments.veterinarian, appointments.status, appointments.notes, appointments.created_date, appointments.updated_date;
 END;
 $$;
@@ -326,9 +327,11 @@ END;
 $$;
 
 -- Actualizar cita
+-- Actualizar cita (appointment)
+-- IMPORTANTE: p_date debe ser VARCHAR en formato 'YYYY-MM-DD' para evitar conversión de zona horaria
 CREATE OR REPLACE FUNCTION update_appointment(
   p_id BIGINT,
-  p_date DATE DEFAULT NULL,
+  p_date VARCHAR DEFAULT NULL, -- Cambiado de DATE a VARCHAR
   p_time TIME DEFAULT NULL,
   p_type appointment_type DEFAULT NULL,
   p_veterinarian VARCHAR DEFAULT NULL,
@@ -353,7 +356,7 @@ BEGIN
   RETURN QUERY
   UPDATE appointments
   SET
-    date = COALESCE(p_date, date),
+    date = COALESCE(p_date::DATE, date),
     time = COALESCE(p_time, time),
     type = COALESCE(p_type, type),
     veterinarian = COALESCE(p_veterinarian, veterinarian),

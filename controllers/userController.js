@@ -119,7 +119,7 @@ class UserController {
       }
       console.log(req.body);
 
-      const { nombre, email, rolName, status, telefono } = req.body;
+      const { nombre, email, rol, rolName, status, telefono } = req.body;
 
       // Verificar si el email ya existe
       const existingUser = await User.findByEmail(email);
@@ -134,7 +134,7 @@ class UserController {
       const newUser = await User.create({
         nombre,
         email,
-        rolName,
+        rol: rol || rolName, // Aceptar tanto rol como rolName
         status,
         telefono,
       });
@@ -173,7 +173,7 @@ class UserController {
       }
 
       const { id } = req.params;
-      const { nombre, email, telefono, rolName, status } = req.body;
+      const { nombre, email, telefono, rol, rolName, status } = req.body;
       console.log(req.body);
 
       // Validar que el ID sea un número
@@ -209,7 +209,7 @@ class UserController {
         nombre,
         email,
         telefono,
-        rolName,
+        rol: rol || rolName, // Aceptar tanto rol (código) como rolName (nombre)
         status,
       });
 

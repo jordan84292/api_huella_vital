@@ -238,6 +238,36 @@ class AppointmentController {
       });
     }
   }
+
+  static async attendAppointment(req, res) {
+    try {
+      const { id } = req.params;
+      const visitData = req.body;
+
+      // Validar que se proporcionaron los datos necesarios
+      if (!visitData.diagnosis || !visitData.treatment) {
+        return res.status(400).json({
+          success: false,
+          message: "Diagnóstico y tratamiento son requeridos",
+        });
+      }
+
+      const result = await Appointment.attendAppointment(id, visitData);
+
+      res.status(200).json({
+        success: true,
+        message: "Cita atendida correctamente",
+        data: result,
+      });
+    } catch (error) {
+      console.error("Error en attendAppointment:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Error interno del servidor",
+        error: error.message,
+      });
+    }
+  }
 }
 
 module.exports = AppointmentController;
