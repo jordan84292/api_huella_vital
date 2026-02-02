@@ -287,6 +287,9 @@ class Appointment {
       const { patientId, date, time, type, veterinarian, status, notes } =
         appointmentData;
 
+      console.log("Creating appointment with data:", appointmentData);
+      console.log("patientId:", patientId);
+
       // Validar que no exista cita en la misma fecha y hora
       const { data: existing, error: errorExisting } = await supabase
         .from("appointments")
@@ -308,6 +311,9 @@ class Appointment {
         p_status: status || "Programada",
         p_notes: notes || null,
       });
+
+      console.log("RPC create_appointment result:", data);
+      console.log("RPC error:", error);
 
       if (error) throw error;
 
