@@ -22,11 +22,70 @@ class Appointment {
     try {
       const { data: appointments, error } = await supabase
         .from("appointments")
-        .select("*");
+        .select("*")
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
 
       if (error) throw error;
-      return appointments;
+
+      if (!appointments || appointments.length === 0) {
+        return [];
+      }
+
+      // Para cada cita, obtener datos del paciente y propietario
+      const appointmentsWithDetails = await Promise.all(
+        appointments.map(async (appointment) => {
+          let patientName = "";
+          let species = "";
+          let ownerName = "";
+
+          // Obtener datos del paciente
+          if (appointment.patientId) {
+            try {
+              const { data: patientData, error: patientError } = await supabase
+                .from("patients")
+                .select("name, species, cedula")
+                .eq("id", appointment.patientId)
+                .single();
+
+              if (!patientError && patientData) {
+                patientName = patientData.name;
+                species = patientData.species;
+
+                // Obtener datos del propietario usando cedula
+                if (patientData.cedula) {
+                  const { data: clientData, error: clientError } =
+                    await supabase
+                      .from("clientes")
+                      .select("name")
+                      .eq("cedula", patientData.cedula)
+                      .single();
+
+                  if (!clientError && clientData) {
+                    ownerName = clientData.name;
+                  }
+                }
+              }
+            } catch (error) {
+              console.error(
+                `Error loading data for appointment ${appointment.id}:`,
+                error,
+              );
+            }
+          }
+
+          return {
+            ...appointment,
+            patientName,
+            species,
+            ownerName,
+          };
+        }),
+      );
+
+      return appointmentsWithDetails;
     } catch (error) {
+      console.error("Error en findAll:", error);
       throw new Error("Error al obtener citas");
     }
   }
