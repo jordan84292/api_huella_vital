@@ -42,21 +42,21 @@ class Appointment {
           let ownerName = "";
 
           console.log(
-            `Processing appointment ${appointment.id}, patientId: ${appointment.patientId}`,
+            `Processing appointment ${appointment.id}, patientId: ${appointment.patientid}`,
           );
 
           // Obtener datos del paciente
-          if (appointment.patientId) {
+          if (appointment.patientid) {
             try {
               const { data: patientData, error: patientError } = await supabase
                 .from("patients")
                 .select("name, species, cedula")
-                .eq("id", appointment.patientId)
+                .eq("id", appointment.patientid)
                 .single();
 
               if (patientError) {
                 console.error(
-                  `Patient not found for ID ${appointment.patientId}:`,
+                  `Patient not found for ID ${appointment.patientid}:`,
                   patientError,
                 );
               }
@@ -97,11 +97,12 @@ class Appointment {
               );
             }
           } else {
-            console.warn(`Appointment ${appointment.id} has no patientId`);
+            console.warn(`Appointment ${appointment.id} has no patientid`);
           }
 
           return {
             ...appointment,
+            patientId: appointment.patientid, // Mapear a camelCase para compatibilidad
             patientName,
             species,
             ownerName,
@@ -180,7 +181,7 @@ class Appointment {
       const { data, error } = await supabase
         .from("appointments")
         .select("*")
-        .eq("patientId", patientId)
+        .eq("patientid", patientId)
         .order("date", { ascending: false })
         .order("time", { ascending: false });
 
@@ -213,6 +214,7 @@ class Appointment {
           }
           return {
             ...appointment,
+            patientId: appointment.patientid, // Mapear a camelCase
             patientName: patientExists.name || "",
             species: patientExists.species || "",
             ownerName: ownerName || "",
