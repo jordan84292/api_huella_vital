@@ -294,12 +294,13 @@ class Appointment {
       console.log("date received:", date);
       console.log("date type:", typeof date);
 
-      // Validar que no exista cita en la misma fecha y hora
+      // Validar que no exista cita en la misma fecha y hora para el mismo veterinario
       const { data: existing, error: errorExisting } = await supabase
         .from("appointments")
         .select("id")
         .eq("date", date)
-        .eq("time", time);
+        .eq("time", time)
+        .eq("veterinarian", veterinarian);
       if (errorExisting) throw errorExisting;
       if (existing && existing.length > 0) {
         throw new Error("Ya existe una cita en la misma fecha y hora");
