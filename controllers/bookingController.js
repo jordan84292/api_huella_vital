@@ -1,5 +1,5 @@
 // controllers/bookingController.js
-const Booking = require("../models/booking");
+const Booking = require("../models/Booking");
 const { validationResult } = require("express-validator");
 
 class BookingController {
