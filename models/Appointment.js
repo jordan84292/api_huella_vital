@@ -307,14 +307,15 @@ class Appointment {
       }
 
       // Validar que el mismo usuario no pueda sacar una cita a la misma hora pero con diferente veterinario
-      const { data: existing, error: errorExisting } = await supabase
-        .from("appointments")
-        .select("id")
-        .eq("date", date)
-        .eq("time", time)
-        .eq("patientId", patientId);
-      if (errorExisting) throw errorExisting;
-      if (existing && existing.length > 0) {
+      const { data: existingPatient, error: errorExistingPatient } =
+        await supabase
+          .from("appointments")
+          .select("id")
+          .eq("date", date)
+          .eq("time", time)
+          .eq("patientId", patientId);
+      if (errorExistingPatient) throw errorExistingPatient;
+      if (existingPatient && existingPatient.length > 0) {
         throw new Error(
           "Ya tiene una cita con otro veterinario en esta fecha y hora",
         );
