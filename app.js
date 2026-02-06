@@ -25,6 +25,7 @@ const patientsRoutes = require("./routes/patientRoutes");
 const visitRoutes = require("./routes/visitRoutes");
 const vaccinationRoutes = require("./routes/vaccinationRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
+const bookingRoutes = require("./routes/bookingRoutes");
 
 // Crear aplicación Express
 const app = express();
@@ -122,6 +123,7 @@ app.use(`${API_PREFIX}/patients`, patientsRoutes);
 app.use(`${API_PREFIX}/visits`, visitRoutes);
 app.use(`${API_PREFIX}/vaccinations`, vaccinationRoutes);
 app.use(`${API_PREFIX}/appointments`, appointmentRoutes);
+app.use(`${API_PREFIX}/booking`, bookingRoutes);
 
 // Ruta para documentación básica
 app.get("/docs", (req, res) => {
